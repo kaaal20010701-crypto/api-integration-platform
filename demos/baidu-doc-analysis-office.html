@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>百度云 办公文档识别</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        html { height: 100%; margin: 0; overflow: hidden; }
+        body { height: 100%; margin: 0; overflow-y: auto; overflow-x: hidden; padding-bottom: 2rem; -webkit-overflow-scrolling: touch; }
+        .demo-page { padding: 1.5rem 2rem; max-width: 100%; min-height: 100%; box-sizing: border-box; }
+        .demo-page h1 { font-size: 1.5rem; margin-bottom: 0.5rem; color: #1a202c; }
+        .demo-page .desc { color: #4a5568; font-size: 0.9rem; margin-bottom: 1.5rem; line-height: 1.5; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.25rem; font-weight: 500; color: #2d3748; }
+        .form-group input[type="file"],
+        .form-group input[type="text"],
+        .form-group select { margin-right: 0.5rem; }
+        .form-group input[type="text"] { width: 100%; max-width: 400px; padding: 0.5rem; border: 1px solid #cbd5e0; border-radius: 6px; }
+        .form-group select { padding: 0.5rem; border: 1px solid #cbd5e0; border-radius: 6px; min-width: 140px; }
+        .form-group .hint { font-size: 0.8rem; color: #718096; margin-top: 0.25rem; }
+        .form-group input[type="checkbox"] { margin-right: 0.5rem; }
+        .form-row { display: flex; flex-wrap: wrap; gap: 1rem 1.5rem; align-items: flex-start; }
+        .form-row .form-group { margin-bottom: 0; }
+        .btn { padding: 0.5rem 1rem; background: #3182ce; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem; }
+        .btn:hover { background: #2c5282; }
+        .btn:disabled { background: #a0aec0; cursor: not-allowed; }
+        #result { margin-top: 1.5rem; }
+        .result-layout { display: flex; gap: 1rem; flex-wrap: wrap; align-items: stretch; }
+        .result-json { flex: 1; min-width: 280px; max-width: 50%; }
+        .result-vis { flex: 1; min-width: 280px; max-width: 50%; }
+        .result-panel-title { font-weight: 600; color: #2d3748; margin-bottom: 0.5rem; font-size: 0.9rem; }
+        .vis-card { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.25rem; min-height: 200px; }
+        .vis-original-wrap { position: relative; display: inline-block; max-width: 100%; margin-top: 0.75rem; }
+        .vis-original-wrap .img-original { display: block; max-width: 100%; height: auto; vertical-align: top; }
+        .vis-original-wrap .overlay-boxes { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+        .vis-original-wrap .overlay-box { position: absolute; box-sizing: border-box; border: 1px solid #2563eb; background: rgba(37,99,235,0.06); font-size: 9px; line-height: 1.2; color: #1d4ed8; padding: 1px 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+        .vis-original-wrap .overlay-box.handwriting { border-color: #16a34a; background: rgba(22,163,74,0.06); color: #15803d; }
+        .json-tree-wrap { background: #2d3748; color: #e2e8f0; border-radius: 8px; padding: 0.75rem 1rem; font-family: monospace; font-size: 0.8rem; max-height: 520px; overflow: auto; margin: 0; white-space: pre-wrap; word-break: break-all; }
+        .panel-actions { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
+        .panel-actions .result-panel-title { margin-bottom: 0; margin-right: auto; }
+        .btn-download { padding: 0.35rem 0.75rem; font-size: 0.85rem; background: #4a5568; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+        .btn-download:hover { background: #2d3748; }
+        .status { margin-top: 0.5rem; color: #718096; }
+        .error { color: #c53030; }
+        .btn-top { position: fixed; right: 1.5rem; bottom: 1.5rem; width: 40px; height: 40px; border-radius: 50%; background: #3182ce; color: #fff; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: none; align-items: center; justify-content: center; font-size: 1.2rem; line-height: 1; z-index: 100; }
+        .btn-top.show { display: flex; }
+        .btn-top:hover { background: #2c5282; }
+    </style>
+</head>
+<body>
+    <div class="demo-page">
+        <h1>百度云 办公文档识别</h1>
+        <p class="desc">
+            对各类办公文档进行版面分析和文字识别，输出图、表、印章、标题等元素及位置信息，并分版块输出文字识别结果。支持多语言、手写/印刷混排、表格/印章/公式/下划线等场景。
+        </p>
+        <form id="form">
+            <div class="form-group">
+                <label for="file">上传图片 / PDF / OFD</label>
+                <input type="file" id="file" name="file" accept="image/jpeg,image/jpg,image/png,image/bmp,application/pdf,application/octet-stream,.ofd">
+                <p class="hint">与下方 URL 四选一，上传优先。支持 jpg/png/bmp、PDF、OFD；图片最短边≥15px，最长边≤8192px。</p>
+            </div>
+            <div class="form-group">
+                <label for="url">或图片 URL</label>
+                <input type="text" id="url" name="url" placeholder="https://...">
+                <p class="hint">请关闭 URL 防盗链。</p>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="pdf_file_num">pdf_file_num（PDF 页码）</label>
+                    <input type="text" id="pdf_file_num" name="pdf_file_num" placeholder="不填默认第1页" style="width:100px;">
+                </div>
+                <div class="form-group">
+                    <label for="ofd_file_num">ofd_file_num（OFD 页码）</label>
+                    <input type="text" id="ofd_file_num" name="ofd_file_num" placeholder="不填默认第1页" style="width:100px;">
+                </div>
+                <div class="form-group">
+                    <label for="language_type">language_type</label>
+                    <select id="language_type" name="language_type">
+                        <option value="">默认 CHN_ENG</option>
+                        <option value="CHN_ENG">CHN_ENG - 中英文</option>
+                        <option value="ENG">ENG - 英文</option>
+                        <option value="auto_detect">auto_detect - 自动检测</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="result_type">result_type</label>
+                    <select id="result_type" name="result_type">
+                        <option value="big">big - 按行返回</option>
+                        <option value="small">small - 行+单字</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="words_type">words_type（文字类型）</label>
+                    <select id="words_type" name="words_type">
+                        <option value="">默认 - 手写印刷混排</option>
+                        <option value="handwring_only">handwring_only - 手写</option>
+                        <option value="handprint_mix">handprint_mix - 手写印刷混排</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>可选开关</label>
+                <div style="display:flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-top: 0.25rem;">
+                    <label><input type="checkbox" id="char_probability" name="char_probability" value="true"> char_probability（单字符置信度）</label>
+                    <label><input type="checkbox" id="detect_direction" name="detect_direction" value="true"> detect_direction（检测图像朝向）</label>
+                    <label><input type="checkbox" id="line_probability" name="line_probability" value="true"> line_probability（行置信度）</label>
+                    <label><input type="checkbox" id="disp_line_poly" name="disp_line_poly" value="true"> disp_line_poly（行四角点坐标）</label>
+                    <label><input type="checkbox" id="layout_analysis" name="layout_analysis" value="true"> layout_analysis（版面分析）</label>
+                    <label><input type="checkbox" id="recg_tables" name="recg_tables" value="true"> recg_tables（识别表格）</label>
+                    <label><input type="checkbox" id="recog_seal" name="recog_seal" value="true"> recog_seal（识别印章）</label>
+                    <label><input type="checkbox" id="recg_formula" name="recg_formula" value="true"> recg_formula（识别公式）</label>
+                    <label><input type="checkbox" id="erase_seal" name="erase_seal" value="true"> erase_seal（擦除水印/印章后再识别）</label>
+                    <label><input type="checkbox" id="disp_underline_analysis" name="disp_underline_analysis" value="true"> disp_underline_analysis（识别下划线）</label>
+                </div>
+            </div>
+            <button type="submit" class="btn" id="submitBtn">提交</button>
+        </form>
+        <p class="status" id="status"></p>
+        <div id="result"></div>
+        <button type="button" class="btn-top" id="btnTop" title="回到顶部">↑</button>
+    </div>
+    <script>
+        (function () {
+            var form = document.getElementById('form');
+            var submitBtn = document.getElementById('submitBtn');
+            var statusEl = document.getElementById('status');
+            var resultEl = document.getElementById('result');
+
+            function setStatus(msg, isError) {
+                statusEl.textContent = msg;
+                statusEl.className = 'status' + (isError ? ' error' : '');
+            }
+
+            function escapeHtml(s) {
+                if (s == null) return '';
+                var div = document.createElement('div');
+                div.textContent = s;
+                return div.innerHTML;
+            }
+
+            function collectWordBoxes(data) {
+                var boxes = [];
+                var results = data.results || [];
+                for (var i = 0; i < results.length; i++) {
+                    var item = results[i];
+                    var wordsType = (item.words_type || 'print').toLowerCase();
+                    var words = item.words;
+                    if (!words) continue;
+                    var list = Array.isArray(words) ? words : [words];
+                    for (var j = 0; j < list.length; j++) {
+                        var w = list[j];
+                        var loc = w.words_location;
+                        if (!loc || loc.left == null) continue;
+                        boxes.push({
+                            left: parseFloat(loc.left),
+                            top: parseFloat(loc.top),
+                            width: parseFloat(loc.width) || 0,
+                            height: parseFloat(loc.height) || 0,
+                            word: (w.word != null ? w.word : w.words) || '',
+                            isHandwriting: wordsType === 'handwriting'
+                        });
+                    }
+                }
+                return boxes;
+            }
+
+            function buildVisHtml(data, inputImageUrl) {
+                if (data.error_code && data.error_code !== 0 && data.error_code !== '0') {
+                    return '<div class="vis-card"><p class="error">' + escapeHtml(data.error_msg || data.error || '请求失败') + '</p></div>';
+                }
+                var html = '<div class="vis-card">';
+                if (inputImageUrl) {
+                    html += '<div class="result-panel-title">原图与识别框</div>';
+                    html += '<div class="vis-original-wrap"><img class="img-original" src="' + escapeHtml(inputImageUrl) + '" alt="原图"><div class="overlay-boxes"></div></div>';
+                } else {
+                    html += '<p class="desc">上传图片后可在此显示标注结果。</p>';
+                }
+                html += '</div>';
+                return html;
+            }
+
+            function drawOverlayBoxes(imgEl, overlayEl, boxes) {
+                if (!boxes || !boxes.length) return;
+                var nw = imgEl.naturalWidth;
+                var nh = imgEl.naturalHeight;
+                var dw = imgEl.offsetWidth;
+                var dh = imgEl.offsetHeight;
+                if (!nw || !nh) return;
+                var scaleX = dw / nw;
+                var scaleY = dh / nh;
+                for (var i = 0; i < boxes.length; i++) {
+                    var b = boxes[i];
+                    if (b.width <= 0 || b.height <= 0) continue;
+                    var div = document.createElement('div');
+                    div.className = 'overlay-box' + (b.isHandwriting ? ' handwriting' : '');
+                    div.style.left = (b.left * scaleX) + 'px';
+                    div.style.top = (b.top * scaleY) + 'px';
+                    div.style.width = Math.max(b.width * scaleX, 4) + 'px';
+                    div.style.height = Math.max(b.height * scaleY, 4) + 'px';
+                    div.textContent = b.word ? (b.word.length > 24 ? b.word.slice(0, 22) + '…' : b.word) : '';
+                    if (b.word) div.title = b.word;
+                    overlayEl.appendChild(div);
+                }
+            }
+
+            var lastResultData = null;
+            var lastInputImageUrl = null;
+
+            function downloadJson() {
+                if (!lastResultData) return;
+                var blob = new Blob([JSON.stringify(lastResultData, null, 2)], { type: 'application/json' });
+                var name = 'doc_analysis_office_result_' + new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '').replace(' ', '_') + '.json';
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = name;
+                a.click();
+                URL.revokeObjectURL(a.href);
+            }
+
+            function downloadVis() {
+                var wrap = resultEl.querySelector('.vis-original-wrap');
+                var img = wrap && wrap.querySelector('.img-original');
+                if (!img || !img.complete || !img.naturalWidth) {
+                    if (lastInputImageUrl) {
+                        var a = document.createElement('a');
+                        a.href = lastInputImageUrl;
+                        a.download = 'doc_analysis_office_original.png';
+                        a.target = '_blank';
+                        a.click();
+                    }
+                    return;
+                }
+                try {
+                    var canvas = document.createElement('canvas');
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
+                    var ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    var boxes = collectWordBoxes(lastResultData);
+                    var lw = Math.max(1, Math.min(canvas.width, canvas.height) / 600);
+                    for (var i = 0; i < boxes.length; i++) {
+                        var b = boxes[i];
+                        ctx.strokeStyle = b.isHandwriting ? '#16a34a' : '#2563eb';
+                        ctx.fillStyle = b.isHandwriting ? 'rgba(22,163,74,0.06)' : 'rgba(37,99,235,0.06)';
+                        ctx.lineWidth = lw;
+                        ctx.strokeRect(b.left, b.top, b.width, b.height);
+                        ctx.fillRect(b.left, b.top, b.width, b.height);
+                    }
+                    var dataUrl = canvas.toDataURL('image/png');
+                    var a = document.createElement('a');
+                    a.href = dataUrl;
+                    a.download = 'doc_analysis_office_annotated_' + new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '').replace(' ', '_') + '.png';
+                    a.click();
+                } catch (e) {
+                    if (lastInputImageUrl) {
+                        var a = document.createElement('a');
+                        a.href = lastInputImageUrl;
+                        a.download = 'doc_analysis_office_original.png';
+                        a.target = '_blank';
+                        a.click();
+                    }
+                }
+            }
+
+            function showResult(data, inputImageUrl) {
+                lastResultData = data;
+                lastInputImageUrl = inputImageUrl || null;
+                var jsonStr = JSON.stringify(data, null, 2);
+                var jsonBlock = '<div class="panel-actions"><span class="result-panel-title">原始 JSON</span><button type="button" class="btn-download" id="btnCopyJson">一键复制</button><button type="button" class="btn-download" id="btnDownloadJson">一键下载</button></div><pre class="json-tree-wrap">' + escapeHtml(jsonStr) + '</pre>';
+                var visHtml = buildVisHtml(data, inputImageUrl);
+                resultEl.innerHTML = '<div class="result-layout">' +
+                    '<div class="result-json">' + jsonBlock + '</div>' +
+                    '<div class="result-vis"><div class="panel-actions"><span class="result-panel-title">可视化</span><button type="button" class="btn-download" id="btnDownloadVis">下载标注图</button></div>' + visHtml + '</div>' +
+                    '</div>';
+
+                var btnCopy = resultEl.querySelector('#btnCopyJson');
+                var btnJson = resultEl.querySelector('#btnDownloadJson');
+                var btnVis = resultEl.querySelector('#btnDownloadVis');
+                if (btnCopy) btnCopy.addEventListener('click', function () {
+                    navigator.clipboard.writeText(JSON.stringify(lastResultData, null, 2)).then(function () {
+                        btnCopy.textContent = '已复制';
+                        setTimeout(function () { btnCopy.textContent = '一键复制'; }, 1500);
+                    });
+                });
+                if (btnJson) btnJson.addEventListener('click', downloadJson);
+                if (btnVis) btnVis.addEventListener('click', downloadVis);
+
+                if (inputImageUrl && lastResultData && !lastResultData.error_code) {
+                    var wrap = resultEl.querySelector('.vis-original-wrap');
+                    var img = wrap && wrap.querySelector('.img-original');
+                    var overlay = wrap && wrap.querySelector('.overlay-boxes');
+                    var boxes = collectWordBoxes(lastResultData);
+                    if (img && overlay && boxes.length) {
+                        if (img.complete && img.naturalWidth) {
+                            drawOverlayBoxes(img, overlay, boxes);
+                        } else {
+                            img.onload = function () { drawOverlayBoxes(img, overlay, boxes); };
+                        }
+                    }
+                }
+            }
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                var fileInput = document.getElementById('file');
+                var urlInput = document.getElementById('url');
+                if (!fileInput.files.length && !urlInput.value.trim()) {
+                    setStatus('请上传图片/PDF/OFD 或填写图片 URL', true);
+                    return;
+                }
+
+                var inputImageUrl = null;
+                if (fileInput.files.length) {
+                    var f = fileInput.files[0];
+                    var fname = (f.name || '').toLowerCase();
+                    if (fname.match(/\.(jpe?g|png|bmp)$/)) {
+                        inputImageUrl = URL.createObjectURL(f);
+                    }
+                } else if (urlInput.value.trim()) {
+                    inputImageUrl = urlInput.value.trim();
+                }
+
+                submitBtn.disabled = true;
+                setStatus('识别中…');
+                resultEl.innerHTML = '';
+
+                var formData = new FormData(form);
+                if (!formData.get('words_type')) formData.set('words_type', '');
+                if (!formData.get('pdf_file_num')) formData.delete('pdf_file_num');
+                if (!formData.get('ofd_file_num')) formData.delete('ofd_file_num');
+                if (!formData.get('language_type')) formData.delete('language_type');
+
+                fetch('/api/demo/baidu_doc_analysis_office', {
+                    method: 'POST',
+                    body: formData
+                })
+                    .then(function (r) {
+                        return r.json().then(function (json) {
+                            if (!r.ok) throw { status: r.status, body: json };
+                            return json;
+                        });
+                    })
+                    .then(function (data) {
+                        setStatus('识别完成');
+                        showResult(data, inputImageUrl);
+                    })
+                    .catch(function (err) {
+                        var msg = err.body && (err.body.error_msg || err.body.error) ? (err.body.error_msg || err.body.error) : (err.message || '请求失败');
+                        setStatus('错误：' + msg, true);
+                        if (err.body) showResult(err.body, inputImageUrl);
+                    })
+                    .finally(function () {
+                        submitBtn.disabled = false;
+                    });
+            });
+
+            var btnTop = document.getElementById('btnTop');
+            if (btnTop) {
+                function onScroll() { btnTop.classList.toggle('show', window.pageYOffset > 200); }
+                window.addEventListener('scroll', onScroll);
+                btnTop.addEventListener('click', function () { window.scrollTo({ top: 0, behavior: 'smooth' }); });
+            }
+        })();
+    </script>
+</body>
+</html>
+

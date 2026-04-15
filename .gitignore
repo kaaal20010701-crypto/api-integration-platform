@@ -1,0 +1,22 @@
+# 本地密钥（切勿提交）
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+
+# Cursor
+.cursor/debug.log
+
+# 系统与编辑器
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo

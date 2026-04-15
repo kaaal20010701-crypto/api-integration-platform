@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>百度云 试卷切题识别</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        html { height: 100%; margin: 0; overflow: hidden; }
+        body { height: 100%; margin: 0; overflow-y: auto; overflow-x: hidden; padding-bottom: 2rem; -webkit-overflow-scrolling: touch; }
+        .demo-page { padding: 1.5rem 2rem; max-width: 100%; min-height: 100%; box-sizing: border-box; }
+        .demo-page h1 { font-size: 1.5rem; margin-bottom: 0.5rem; color: #1a202c; }
+        .demo-page .desc { color: #4a5568; font-size: 0.9rem; margin-bottom: 1.5rem; line-height: 1.5; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.25rem; font-weight: 500; color: #2d3748; }
+        .form-group input[type="file"],
+        .form-group input[type="text"],
+        .form-group select { margin-right: 0.5rem; }
+        .form-group input[type="text"] { width: 100%; max-width: 400px; padding: 0.5rem; border: 1px solid #cbd5e0; border-radius: 6px; }
+        .form-group select { padding: 0.5rem; border: 1px solid #cbd5e0; border-radius: 6px; min-width: 160px; }
+        .form-group .hint { font-size: 0.8rem; color: #718096; margin-top: 0.25rem; }
+        .form-row { display: flex; flex-wrap: wrap; gap: 1rem 1.5rem; align-items: flex-start; }
+        .form-row .form-group { margin-bottom: 0; }
+        .btn { padding: 0.5rem 1rem; background: #3182ce; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem; }
+        .btn:hover { background: #2c5282; }
+        .btn:disabled { background: #a0aec0; cursor: not-allowed; }
+        #result { margin-top: 1.5rem; }
+        .result-layout { display: flex; gap: 1rem; flex-wrap: wrap; align-items: stretch; }
+        .result-json { flex: 1; min-width: 280px; max-width: 50%; }
+        .result-vis { flex: 1; min-width: 280px; max-width: 50%; }
+        .result-panel-title { font-weight: 600; color: #2d3748; margin-bottom: 0.5rem; font-size: 0.9rem; }
+        .vis-card { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.25rem; min-height: 200px; }
+        .vis-original-wrap { position: relative; display: inline-block; max-width: 100%; margin-top: 0.75rem; }
+        .vis-original-wrap .img-original { display: block; max-width: 100%; height: auto; vertical-align: top; }
+        .vis-original-wrap .overlay-boxes { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+        .vis-original-wrap .overlay-box { position: absolute; box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+        .vis-original-wrap .overlay-q { border: 2px solid #2563eb; background: rgba(37,99,235,0.1); font-size: 10px; font-weight: 600; color: #1d4ed8; padding: 2px 4px; }
+        .vis-original-wrap .overlay-e { border: 1px solid; font-size: 0; padding: 0; }
+        .vis-option { display: block; margin: 0.5rem 0 0 0; font-size: 0.85rem; color: #4a5568; }
+        .vis-option input { margin-right: 0.35rem; }
+        .json-tree-wrap { background: #2d3748; color: #e2e8f0; border-radius: 8px; padding: 0.75rem 1rem; font-family: monospace; font-size: 0.8rem; max-height: 520px; overflow: auto; margin: 0; white-space: pre-wrap; word-break: break-all; }
+        .panel-actions { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
+        .panel-actions .result-panel-title { margin-bottom: 0; margin-right: auto; }
+        .btn-download { padding: 0.35rem 0.75rem; font-size: 0.85rem; background: #4a5568; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+        .btn-download:hover { background: #2d3748; }
+        .status { margin-top: 0.5rem; color: #718096; }
+        .error { color: #c53030; }
+        .btn-top { position: fixed; right: 1.5rem; bottom: 1.5rem; width: 40px; height: 40px; border-radius: 50%; background: #3182ce; color: #fff; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: none; align-items: center; justify-content: center; font-size: 1.2rem; line-height: 1; z-index: 100; }
+        .btn-top.show { display: flex; }
+        .btn-top:hover { background: #2c5282; }
+    </style>
+</head>
+<body>
+    <div class="demo-page">
+        <h1>百度云 试卷切题识别</h1>
+        <p class="desc">
+            对图片/PDF 内题目自动切分与结构化识别，按题输出题干、选项、答案等；适用于整页试卷、习题册、课本等，可用于拍照搜题、题库录入、智能判卷等场景。
+        </p>
+        <form id="form">
+            <div class="form-group">
+                <label for="file">上传图片或 PDF</label>
+                <input type="file" id="file" name="file" accept="image/jpeg,image/jpg,image/png,image/bmp,application/pdf">
+                <p class="hint">与下方 URL 二选一，上传优先。支持 jpg/png/bmp 或 PDF；最短边≥15px，最长边≤8192px。</p>
+            </div>
+            <div class="form-group">
+                <label for="url">或图片 URL</label>
+                <input type="text" id="url" name="url" placeholder="https://...">
+                <p class="hint">请关闭 URL 防盗链。</p>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="pdf_file_num">pdf_file_num（PDF 页码）</label>
+                    <input type="text" id="pdf_file_num" name="pdf_file_num" placeholder="不填默认第1页" style="width:100px;">
+                </div>
+                <div class="form-group">
+                    <label for="language_type">language_type</label>
+                    <select id="language_type" name="language_type">
+                        <option value="CHN_ENG">CHN_ENG - 中英文</option>
+                        <option value="ENG">ENG - 英文</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="words_type">words_type</label>
+                    <select id="words_type" name="words_type">
+                        <option value="handprint_mix">handprint_mix - 手写印刷混排</option>
+                        <option value="handwring_only">handwring_only - 手写</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>可选开关</label>
+                <div style="display:flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-top: 0.25rem;">
+                    <label><input type="checkbox" id="detect_direction" name="detect_direction" value="true"> detect_direction（检测图像朝向）</label>
+                    <label><input type="checkbox" id="splice_text" name="splice_text" value="true"> splice_text（拼接题目元素文本）</label>
+                    <label><input type="checkbox" id="enhance" name="enhance" value="true"> enhance（图像矫正与增强）</label>
+                    <label><input type="checkbox" id="only_split" name="only_split" value="true"> only_split（仅题目切分）</label>
+                </div>
+            </div>
+            <button type="submit" class="btn" id="submitBtn">提交</button>
+        </form>
+        <p class="status" id="status"></p>
+        <div id="result"></div>
+        <button type="button" class="btn-top" id="btnTop" title="回到顶部">↑</button>
+    </div>
+    <script>
+        (function () {
+            var form = document.getElementById('form');
+            var submitBtn = document.getElementById('submitBtn');
+            var statusEl = document.getElementById('status');
+            var resultEl = document.getElementById('result');
+
+            var qusTypeNames = { '0': '选择', '1': '判断', '2': '填空', '3': '问答', '4': '其他' };
+            var elemTypeNames = { '0': '题干', '1': '子题', '2': '答案', '3': '选项', '4': '配图', '5': '参考答案' };
+            var elemTypeColors = { '0': '#2563eb', '1': '#7c3aed', '2': '#ea580c', '3': '#16a34a', '4': '#6366f1', '5': '#0d9488' };
+            var elemTypeBg = { '0': 'rgba(37,99,235,0.12)', '1': 'rgba(124,58,237,0.12)', '2': 'rgba(234,88,12,0.12)', '3': 'rgba(22,163,74,0.12)', '4': 'rgba(99,102,241,0.12)', '5': 'rgba(13,148,136,0.12)' };
+
+            function setStatus(msg, isError) {
+                statusEl.textContent = msg;
+                statusEl.className = 'status' + (isError ? ' error' : '');
+            }
+
+            function escapeHtml(s) {
+                if (s == null) return '';
+                var div = document.createElement('div');
+                div.textContent = s;
+                return div.innerHTML;
+            }
+
+            /** 从 location 得到 bbox。支持 API 实际格式：{ points: [{x,y},...] }，或 left/top/width/height，或 points 数组 */
+            function locationToBbox(loc) {
+                if (!loc) return null;
+                var points = [];
+                if (loc.points && Array.isArray(loc.points)) {
+                    for (var i = 0; i < loc.points.length; i++) {
+                        var p = loc.points[i];
+                        if (p && (typeof p.x === 'number' || typeof p.y === 'number')) points.push({ x: p.x, y: p.y });
+                        else if (Array.isArray(p) && p.length >= 2) points.push({ x: p[0], y: p[1] });
+                    }
+                } else if (Array.isArray(loc)) {
+                    for (var i = 0; i < loc.length; i++) {
+                        var p = loc[i];
+                        if (p && (typeof p.x === 'number' || typeof p.y === 'number')) points.push({ x: p.x, y: p.y });
+                        else if (Array.isArray(p) && p.length >= 2) points.push({ x: p[0], y: p[1] });
+                    }
+                } else if (typeof loc.left === 'number' && typeof loc.top === 'number') {
+                    return { left: loc.left, top: loc.top, width: loc.width || 0, height: loc.height || 0 };
+                }
+                if (points.length < 2) return null;
+                var minX = points[0].x, maxX = points[0].x, minY = points[0].y, maxY = points[0].y;
+                for (var j = 1; j < points.length; j++) {
+                    if (points[j].x < minX) minX = points[j].x;
+                    if (points[j].x > maxX) maxX = points[j].x;
+                    if (points[j].y < minY) minY = points[j].y;
+                    if (points[j].y > maxY) maxY = points[j].y;
+                }
+                return { left: minX, top: minY, width: maxX - minX, height: maxY - minY };
+            }
+
+            function collectQuestionBoxes(data) {
+                var boxes = [];
+                var list = data.qus_result || [];
+                for (var i = 0; i < list.length; i++) {
+                    var q = list[i];
+                    var bbox = locationToBbox(q.qus_location);
+                    if (!bbox || bbox.width <= 0 || bbox.height <= 0) continue;
+                    var qusType = q.qus_type != null ? String(q.qus_type) : '';
+                    var label = (qusTypeNames[qusType] != null ? qusTypeNames[qusType] : '题') + (i + 1);
+                    boxes.push({
+                        left: bbox.left,
+                        top: bbox.top,
+                        width: bbox.width,
+                        height: bbox.height,
+                        label: label,
+                        index: i + 1
+                    });
+                }
+                return boxes;
+            }
+
+            /** 收集题目元素框（题干/子题/答案/选项/配图/参考答案），用于可选的可视化层 */
+            function collectElementBoxes(data) {
+                var boxes = [];
+                var list = data.qus_result || [];
+                for (var i = 0; i < list.length; i++) {
+                    var elements = list[i].qus_element || [];
+                    for (var j = 0; j < elements.length; j++) {
+                        var el = elements[j];
+                        var bbox = locationToBbox(el.elem_location);
+                        if (!bbox || bbox.width <= 0 || bbox.height <= 0) continue;
+                        var elemType = el.elem_type != null ? String(el.elem_type) : '';
+                        boxes.push({
+                            left: bbox.left,
+                            top: bbox.top,
+                            width: bbox.width,
+                            height: bbox.height,
+                            elemType: elemType,
+                            label: elemTypeNames[elemType] || elemType
+                        });
+                    }
+                }
+                return boxes;
+            }
+
+            function buildVisHtml(data, inputImageUrl) {
+                if (data.error_code && data.error_code !== 0 && data.error_code !== '0') {
+                    return '<div class="vis-card"><p class="error">' + escapeHtml(data.error_msg || data.error || '请求失败') + '</p></div>';
+                }
+                var html = '<div class="vis-card">';
+                if (inputImageUrl) {
+                    html += '<div class="result-panel-title">原图与题目框</div>';
+                    html += '<label class="vis-option"><input type="checkbox" id="showElemBoxes" checked> 显示元素框（题干/选项/答案等）</label>';
+                    html += '<div class="vis-original-wrap"><img class="img-original" src="' + escapeHtml(inputImageUrl) + '" alt="原图"><div class="overlay-boxes overlay-questions"></div><div class="overlay-boxes overlay-elements"></div></div>';
+                } else {
+                    html += '<p class="desc">上传图片后可在此显示切题标注。</p>';
+                }
+                html += '</div>';
+                return html;
+            }
+
+            function drawOverlayBoxes(imgEl, overlayEl, boxes, options) {
+                options = options || {};
+                var className = options.className || 'overlay-box';
+                var scaleX = imgEl.offsetWidth / (imgEl.naturalWidth || 1);
+                var scaleY = imgEl.offsetHeight / (imgEl.naturalHeight || 1);
+                for (var i = 0; i < boxes.length; i++) {
+                    var b = boxes[i];
+                    if (b.width <= 0 || b.height <= 0) continue;
+                    var div = document.createElement('div');
+                    div.className = className;
+                    if (options.borderColor) div.style.borderColor = options.borderColor;
+                    if (options.bgColor) div.style.background = options.bgColor;
+                    if (options.color) div.style.color = options.color;
+                    div.style.left = (b.left * scaleX) + 'px';
+                    div.style.top = (b.top * scaleY) + 'px';
+                    div.style.width = Math.max(b.width * scaleX, 4) + 'px';
+                    div.style.height = Math.max(b.height * scaleY, 4) + 'px';
+                    div.textContent = b.label || '';
+                    div.title = b.label || '';
+                    overlayEl.appendChild(div);
+                }
+            }
+
+            function refreshOverlays() {
+                if (!lastResultData || lastResultData.error_code) return;
+                var wrap = resultEl.querySelector('.vis-original-wrap');
+                if (!wrap) return;
+                var img = wrap.querySelector('.img-original');
+                var overlayQ = wrap.querySelector('.overlay-questions');
+                var overlayE = wrap.querySelector('.overlay-elements');
+                var showElem = wrap.closest('.vis-card') && wrap.closest('.vis-card').querySelector('#showElemBoxes');
+                if (!img || !overlayQ) return;
+                overlayQ.innerHTML = '';
+                overlayE.innerHTML = '';
+                var qBoxes = collectQuestionBoxes(lastResultData);
+                drawOverlayBoxes(img, overlayQ, qBoxes, { className: 'overlay-box overlay-q', borderColor: '#2563eb', bgColor: 'rgba(37,99,235,0.1)', color: '#1d4ed8' });
+                if (showElem && showElem.checked && overlayE) {
+                    var eBoxes = collectElementBoxes(lastResultData);
+                    for (var i = 0; i < eBoxes.length; i++) {
+                        var b = eBoxes[i];
+                        var c = elemTypeColors[b.elemType] || '#64748b';
+                        var bg = elemTypeBg[b.elemType] || 'rgba(100,116,139,0.12)';
+                        var div = document.createElement('div');
+                        div.className = 'overlay-box overlay-e';
+                        div.style.borderColor = c;
+                        div.style.background = bg;
+                        div.style.color = c;
+                        var scaleX = img.offsetWidth / (img.naturalWidth || 1);
+                        var scaleY = img.offsetHeight / (img.naturalHeight || 1);
+                        div.style.left = (b.left * scaleX) + 'px';
+                        div.style.top = (b.top * scaleY) + 'px';
+                        div.style.width = Math.max(b.width * scaleX, 4) + 'px';
+                        div.style.height = Math.max(b.height * scaleY, 4) + 'px';
+                        div.title = b.label;
+                        overlayE.appendChild(div);
+                    }
+                }
+            }
+
+            var lastResultData = null;
+            var lastInputImageUrl = null;
+
+            function downloadJson() {
+                if (!lastResultData) return;
+                var blob = new Blob([JSON.stringify(lastResultData, null, 2)], { type: 'application/json' });
+                var name = 'paper_cut_edu_result_' + new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '').replace(' ', '_') + '.json';
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = name;
+                a.click();
+                URL.revokeObjectURL(a.href);
+            }
+
+            function downloadVis() {
+                var wrap = resultEl.querySelector('.vis-original-wrap');
+                var img = wrap && wrap.querySelector('.img-original');
+                var showElem = wrap && wrap.closest('.vis-card') && wrap.closest('.vis-card').querySelector('#showElemBoxes');
+                if (!img || !img.complete || !img.naturalWidth) {
+                    if (lastInputImageUrl) {
+                        var a = document.createElement('a');
+                        a.href = lastInputImageUrl;
+                        a.download = 'paper_cut_edu_original.png';
+                        a.target = '_blank';
+                        a.click();
+                    }
+                    return;
+                }
+                try {
+                    var canvas = document.createElement('canvas');
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
+                    var ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    var lw = Math.max(1, Math.min(canvas.width, canvas.height) / 500);
+                    var fontPx = Math.max(12, canvas.width / 40);
+                    ctx.font = fontPx + 'px sans-serif';
+                    if (showElem && showElem.checked) {
+                        var eBoxes = collectElementBoxes(lastResultData);
+                        for (var i = 0; i < eBoxes.length; i++) {
+                            var b = eBoxes[i];
+                            var c = elemTypeColors[b.elemType] || '#64748b';
+                            ctx.strokeStyle = c;
+                            ctx.fillStyle = elemTypeBg[b.elemType] || 'rgba(100,116,139,0.12)';
+                            ctx.lineWidth = Math.max(1, lw - 0.5);
+                            ctx.strokeRect(b.left, b.top, b.width, b.height);
+                            ctx.fillRect(b.left, b.top, b.width, b.height);
+                        }
+                    }
+                    var qBoxes = collectQuestionBoxes(lastResultData);
+                    ctx.strokeStyle = '#2563eb';
+                    ctx.fillStyle = 'rgba(37,99,235,0.1)';
+                    ctx.lineWidth = lw;
+                    for (var i = 0; i < qBoxes.length; i++) {
+                        var b = qBoxes[i];
+                        ctx.strokeRect(b.left, b.top, b.width, b.height);
+                        ctx.fillRect(b.left, b.top, b.width, b.height);
+                        ctx.fillStyle = '#1d4ed8';
+                        ctx.fillText(b.label || ('题' + b.index), b.left + 4, b.top + fontPx + 2);
+                        ctx.fillStyle = 'rgba(37,99,235,0.1)';
+                    }
+                    var dataUrl = canvas.toDataURL('image/png');
+                    var a = document.createElement('a');
+                    a.href = dataUrl;
+                    a.download = 'paper_cut_edu_annotated_' + new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '').replace(' ', '_') + '.png';
+                    a.click();
+                } catch (e) {
+                    if (lastInputImageUrl) {
+                        var a = document.createElement('a');
+                        a.href = lastInputImageUrl;
+                        a.download = 'paper_cut_edu_original.png';
+                        a.target = '_blank';
+                        a.click();
+                    }
+                }
+            }
+
+            function showResult(data, inputImageUrl) {
+                lastResultData = data;
+                lastInputImageUrl = inputImageUrl || null;
+                var jsonStr = JSON.stringify(data, null, 2);
+                var jsonBlock = '<div class="panel-actions"><span class="result-panel-title">原始 JSON</span><button type="button" class="btn-download" id="btnCopyJson">一键复制</button><button type="button" class="btn-download" id="btnDownloadJson">一键下载</button></div><pre class="json-tree-wrap">' + escapeHtml(jsonStr) + '</pre>';
+                var visHtml = buildVisHtml(data, inputImageUrl);
+                resultEl.innerHTML = '<div class="result-layout">' +
+                    '<div class="result-json">' + jsonBlock + '</div>' +
+                    '<div class="result-vis"><div class="panel-actions"><span class="result-panel-title">可视化</span><button type="button" class="btn-download" id="btnDownloadVis">下载标注图</button></div>' + visHtml + '</div>' +
+                    '</div>';
+
+                var btnCopy = resultEl.querySelector('#btnCopyJson');
+                var btnJson = resultEl.querySelector('#btnDownloadJson');
+                var btnVis = resultEl.querySelector('#btnDownloadVis');
+                if (btnCopy) btnCopy.addEventListener('click', function () {
+                    navigator.clipboard.writeText(JSON.stringify(lastResultData, null, 2)).then(function () {
+                        btnCopy.textContent = '已复制';
+                        setTimeout(function () { btnCopy.textContent = '一键复制'; }, 1500);
+                    });
+                });
+                if (btnJson) btnJson.addEventListener('click', downloadJson);
+                if (btnVis) btnVis.addEventListener('click', downloadVis);
+
+                if (inputImageUrl && lastResultData && !lastResultData.error_code) {
+                    var wrap = resultEl.querySelector('.vis-original-wrap');
+                    var img = wrap && wrap.querySelector('.img-original');
+                    if (img) {
+                        function doRefresh() {
+                            refreshOverlays();
+                        }
+                        if (img.complete && img.naturalWidth) {
+                            doRefresh();
+                        } else {
+                            img.onload = doRefresh;
+                        }
+                        var cb = resultEl.querySelector('#showElemBoxes');
+                        if (cb) cb.addEventListener('change', doRefresh);
+                    }
+                }
+            }
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                var fileInput = document.getElementById('file');
+                var urlInput = document.getElementById('url');
+                if (!fileInput.files.length && !urlInput.value.trim()) {
+                    setStatus('请上传图片/PDF 或填写图片 URL', true);
+                    return;
+                }
+
+                var inputImageUrl = null;
+                if (fileInput.files.length) {
+                    var f = fileInput.files[0];
+                    var fname = (f.name || '').toLowerCase();
+                    if (fname.match(/\.(jpe?g|png|bmp)$/)) {
+                        inputImageUrl = URL.createObjectURL(f);
+                    }
+                } else if (urlInput.value.trim()) {
+                    inputImageUrl = urlInput.value.trim();
+                }
+
+                submitBtn.disabled = true;
+                setStatus('识别中…');
+                resultEl.innerHTML = '';
+
+                var formData = new FormData(form);
+                if (!formData.get('pdf_file_num')) formData.delete('pdf_file_num');
+
+                fetch('/api/demo/baidu_paper_cut_edu', {
+                    method: 'POST',
+                    body: formData
+                })
+                    .then(function (r) {
+                        return r.json().then(function (json) {
+                            if (!r.ok) throw { status: r.status, body: json };
+                            return json;
+                        });
+                    })
+                    .then(function (data) {
+                        setStatus('识别完成');
+                        showResult(data, inputImageUrl);
+                    })
+                    .catch(function (err) {
+                        var msg = err.body && (err.body.error_msg || err.body.error) ? (err.body.error_msg || err.body.error) : (err.message || '请求失败');
+                        setStatus('错误：' + msg, true);
+                        if (err.body) showResult(err.body, inputImageUrl);
+                    })
+                    .finally(function () {
+                        submitBtn.disabled = false;
+                    });
+            });
+
+            var btnTop = document.getElementById('btnTop');
+            if (btnTop) {
+                function onScroll() { btnTop.classList.toggle('show', window.pageYOffset > 200); }
+                window.addEventListener('scroll', onScroll);
+                btnTop.addEventListener('click', function () { window.scrollTo({ top: 0, behavior: 'smooth' }); });
+            }
+        })();
+    </script>
+</body>
+</html>

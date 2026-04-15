@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>百度云 文档解析（PaddleOCR-VL）</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        html { height: 100%; margin: 0; overflow: hidden; }
+        body { height: 100%; margin: 0; overflow-y: auto; overflow-x: hidden; padding-bottom: 2rem; -webkit-overflow-scrolling: touch; }
+        .demo-page { padding: 1.5rem 2rem; max-width: 100%; min-height: 100%; box-sizing: border-box; }
+        .demo-page h1 { font-size: 1.5rem; margin-bottom: 0.5rem; color: #1a202c; }
+        .demo-page .desc { color: #4a5568; font-size: 0.9rem; margin-bottom: 1.5rem; line-height: 1.5; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.25rem; font-weight: 500; color: #2d3748; }
+        .form-group input[type="file"], .form-group input[type="text"], .form-group input[type="checkbox"],
+        .form-group select { margin-right: 0.5rem; }
+        .form-group input[type="text"] { width: 100%; max-width: 400px; padding: 0.5rem; border: 1px solid #cbd5e0; border-radius: 6px; }
+        .form-group select { padding: 0.5rem; border: 1px solid #cbd5e0; border-radius: 6px; min-width: 140px; }
+        .form-group .hint { font-size: 0.8rem; color: #718096; margin-top: 0.25rem; }
+        .form-row { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }
+        .form-row .form-group { margin-bottom: 0; }
+        .btn { padding: 0.5rem 1rem; background: #3182ce; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem; }
+        .btn:hover { background: #2c5282; }
+        .btn:disabled { background: #a0aec0; cursor: not-allowed; }
+        #result { margin-top: 1.5rem; }
+        .result-layout { display: flex; gap: 1rem; flex-wrap: wrap; align-items: stretch; }
+        .result-json { flex: 1; min-width: 280px; max-width: 50%; }
+        .result-vis { flex: 1; min-width: 280px; max-width: 50%; }
+        .result-panel-title { font-weight: 600; color: #2d3748; margin-bottom: 0.5rem; font-size: 0.9rem; }
+        .vis-card { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.25rem; min-height: 200px; }
+        .vis-original-wrap { position: relative; display: inline-block; max-width: 100%; margin-bottom: 1rem; }
+        .vis-original-wrap .img-original { display: block; max-width: 100%; height: auto; vertical-align: top; }
+        .vis-original-wrap .overlay-boxes { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+        .vis-original-wrap .overlay-box { position: absolute; box-sizing: border-box; border-width: 2px; border-style: solid; border-radius: 4px; }
+        .vis-original-wrap .overlay-box.layout-text { border-color: #3182ce; background: rgba(49,130,206,0.1); }
+        .vis-original-wrap .overlay-box.layout-table { border-color: #16a34a; background: rgba(22,163,74,0.1); }
+        .vis-original-wrap .overlay-box.layout-title { border-color: #dc2626; background: rgba(220,38,38,0.08); }
+        .vis-original-wrap .overlay-box.layout-image { border-color: #7c3aed; background: rgba(124,58,237,0.06); }
+        .vis-original-wrap .overlay-box.layout-formula { border-color: #ea580c; background: rgba(234,88,12,0.06); }
+        .vis-original-wrap .overlay-box.layout-seal { border-color: #b45309; background: rgba(180,83,9,0.1); }
+        .vis-original-wrap .overlay-box.layout-header { border-color: #64748b; background: rgba(100,116,139,0.08); }
+        .vis-legend { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; font-size: 0.75rem; color: #64748b; margin-bottom: 0.5rem; }
+        .vis-legend-item { display: flex; align-items: center; gap: 0.25rem; }
+        .vis-legend-dot { width: 10px; height: 10px; border-radius: 2px; border: 1px solid; }
+        .vis-card .page-text { white-space: pre-wrap; line-height: 1.5; font-size: 0.85rem; color: #4a5568; margin-bottom: 1rem; padding: 0.75rem; background: #fff; border-radius: 6px; max-height: 280px; overflow-y: auto; }
+        .page-tabs { display: flex; gap: 0.25rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+        .page-tab { padding: 0.35rem 0.75rem; background: #e2e8f0; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+        .page-tab:hover { background: #cbd5e0; }
+        .page-tab.active { background: #3182ce; color: #fff; }
+        .page-panel { display: none; }
+        .page-panel.active { display: block; }
+        .layout-list { margin-bottom: 1rem; }
+        .layout-item { display: flex; gap: 0.5rem; align-items: flex-start; padding: 0.4rem 0.6rem; background: #fff; border-radius: 6px; margin-bottom: 0.35rem; border-left: 3px solid #cbd5e0; }
+        .layout-item.type-text { border-left-color: #3182ce; }
+        .layout-item.type-table { border-left-color: #16a34a; }
+        .layout-item.type-title { border-left-color: #dc2626; }
+        .layout-item.type-image { border-left-color: #7c3aed; }
+        .layout-item.type-formula { border-left-color: #ea580c; }
+        .layout-item.type-seal { border-left-color: #b45309; }
+        .layout-item.type-header { border-left-color: #64748b; }
+        .layout-type-badge { flex-shrink: 0; padding: 0.15rem 0.5rem; font-size: 0.7rem; border-radius: 4px; background: #edf2f7; color: #4a5568; }
+        .layout-item .layout-text-preview { flex: 1; font-size: 0.85rem; color: #2d3748; white-space: pre-wrap; word-break: break-word; max-height: 20em; overflow-y: auto; }
+        .table-preview { overflow-x: auto; margin-bottom: 1rem; font-size: 0.8rem; }
+        .table-preview table { border-collapse: collapse; min-width: 100%; }
+        .table-preview th, .table-preview td { border: 1px solid #e2e8f0; padding: 0.35rem 0.5rem; text-align: left; }
+        .table-preview th { background: #f1f5f9; font-weight: 600; }
+        .img-preview { max-width: 100%; max-height: 180px; border-radius: 6px; margin-bottom: 0.5rem; }
+        .img-desc { font-size: 0.8rem; color: #64748b; margin-bottom: 0.75rem; white-space: pre-wrap; }
+        .json-tree-wrap { background: #2d3748; color: #e2e8f0; border-radius: 8px; padding: 0.75rem 1rem; font-family: monospace; font-size: 0.8rem; max-height: 520px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+        .panel-actions { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
+        .panel-actions .result-panel-title { margin-bottom: 0; margin-right: auto; }
+        .btn-download { padding: 0.35rem 0.75rem; font-size: 0.85rem; background: #4a5568; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+        .btn-download:hover { background: #2d3748; }
+        .status { margin-top: 0.5rem; color: #718096; }
+        .error { color: #c53030; }
+        .btn-top { position: fixed; right: 1.5rem; bottom: 1.5rem; width: 40px; height: 40px; border-radius: 50%; background: #3182ce; color: #fff; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: none; align-items: center; justify-content: center; font-size: 1.2rem; line-height: 1; z-index: 100; }
+        .btn-top.show { display: flex; }
+        .btn-top:hover { background: #2c5282; }
+    </style>
+</head>
+<body>
+    <div class="demo-page">
+        <h1>百度云 文档解析（PaddleOCR-VL）</h1>
+        <p class="desc">
+            多模态文档解析 SOTA 方案，可精准识别印刷文本、手写文本、表格、公式、图表、印章等复杂文档元素；支持 111 种语言，覆盖中英日韩拉丁文等。返回 Markdown/JSON 结构化输出。
+        </p>
+        <form id="form">
+            <div class="form-group">
+                <label for="file">上传文档</label>
+                <input type="file" id="file" name="file" accept=".pdf,.jpg,.jpeg,.png,.bmp,.tif,.tiff,image/*,application/pdf">
+                <p class="hint">与下方 file_url 二选一。支持 pdf、jpg、jpeg、png、bmp、tif、tiff，图片最长边≤4096px，文档≤100M，PDF 最大 500 页。超过 50M 须用 file_url。</p>
+            </div>
+            <div class="form-group">
+                <label for="file_url">或 file_url</label>
+                <input type="text" id="file_url" name="file_url" placeholder="https://...">
+                <p class="hint">文件 URL，长度≤1024 字节，请关闭防盗链。</p>
+            </div>
+            <div class="form-group" id="fileNameGroup" style="display:none">
+                <label for="file_name">file_name（使用 file_url 时必填）</label>
+                <input type="text" id="file_name" name="file_name" placeholder="document.pdf">
+                <p class="hint">保证文件名后缀正确，如 1.pdf</p>
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" id="analysis_chart" name="analysis_chart" value="true"> analysis_chart - 是否对统计图表进行解析</label>
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" id="merge_tables" name="merge_tables" value="true"> merge_tables - 跨页表格合并输出</label>
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" id="relevel_titles" name="relevel_titles" value="true"> relevel_titles - 对段落标题分级</label>
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" id="recognize_seal" name="recognize_seal" value="true"> recognize_seal - 识别印章内容</label>
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" id="return_span_boxes" name="return_span_boxes" value="true"> return_span_boxes - 返回行坐标</label>
+            </div>
+            <button type="submit" class="btn" id="submitBtn">提交</button>
+        </form>
+        <p class="status" id="status"></p>
+        <div id="result"></div>
+        <button type="button" class="btn-top" id="btnTop" title="回到顶部">↑</button>
+    </div>
+    <script>
+        (function () {
+            var form = document.getElementById('form');
+            var submitBtn = document.getElementById('submitBtn');
+            var statusEl = document.getElementById('status');
+            var resultEl = document.getElementById('result');
+            var fileInput = document.getElementById('file');
+            var fileUrlInput = document.getElementById('file_url');
+            var fileNameGroup = document.getElementById('fileNameGroup');
+
+            fileUrlInput.addEventListener('input', function () {
+                fileNameGroup.style.display = fileUrlInput.value.trim() ? 'block' : 'none';
+            });
+
+            function setStatus(msg, isError) {
+                statusEl.textContent = msg;
+                statusEl.className = 'status' + (isError ? ' error' : '');
+            }
+
+            function escapeHtml(s) {
+                if (s == null) return '';
+                var div = document.createElement('div');
+                div.textContent = s;
+                return div.innerHTML;
+            }
+
+            function getLayoutClass(type) {
+                if (!type) return 'layout-text';
+                var t = (type + '').toLowerCase();
+                if (t.indexOf('table') >= 0) return 'layout-table';
+                if (t.indexOf('doc_title') >= 0 || t.indexOf('paragraph_title') >= 0 || t.indexOf('figure_title') >= 0) return 'layout-title';
+                if (t.indexOf('chart') >= 0 || t.indexOf('image') >= 0 || t.indexOf('figure') >= 0 || t.indexOf('header_image') >= 0 || t.indexOf('footer_image') >= 0) return 'layout-image';
+                if (t.indexOf('formula') >= 0) return 'layout-formula';
+                if (t.indexOf('seal') >= 0) return 'layout-seal';
+                if (t.indexOf('header') >= 0 || t.indexOf('footer') >= 0 || t.indexOf('number') >= 0) return 'layout-header';
+                return 'layout-text';
+            }
+            function mdTableToHtml(md) {
+                if (!md || typeof md !== 'string') return '';
+                var lines = md.trim().split('\n').filter(function (l) { return l.trim(); });
+                if (lines.length < 1) return escapeHtml(md);
+                function parseRow(line) {
+                    var arr = line.split('|').map(function (c) { return c.trim(); });
+                    while (arr.length && arr[0] === '') arr.shift();
+                    while (arr.length && arr[arr.length - 1] === '') arr.pop();
+                    return arr;
+                }
+                var header = parseRow(lines[0]);
+                var dataStart = 1;
+                if (lines.length > 1 && /^[\s|\-:]+$/.test(lines[1].replace(/\|/g, ''))) dataStart = 2;
+                var html = '<table><thead><tr>';
+                header.forEach(function (h) { html += '<th>' + escapeHtml(h) + '</th>'; });
+                html += '</tr></thead><tbody>';
+                for (var i = dataStart; i < lines.length; i++) {
+                    var cells = parseRow(lines[i]);
+                    if (cells.length) {
+                        html += '<tr>';
+                        cells.forEach(function (c) { html += '<td>' + escapeHtml(c) + '</td>'; });
+                        html += '</tr>';
+                    }
+                }
+                html += '</tbody></table>';
+                return html;
+            }
+
+            function drawOverlayBoxes(imgEl, overlayEl, pages, pageIdx) {
+                var nw = imgEl.naturalWidth;
+                var nh = imgEl.naturalHeight;
+                var dw = imgEl.offsetWidth;
+                var dh = imgEl.offsetHeight;
+                if (!nw || !nh) return;
+                var scaleX = dw / nw;
+                var scaleY = dh / nh;
+                var page = (pages && pages[pageIdx]) || {};
+                var layouts = page.layouts || [];
+                var meta = page.meta || {};
+                var pw = meta.page_width || nw;
+                var ph = meta.page_height || nh;
+                var scaleLx = pw > 0 ? dw / pw : scaleX;
+                var scaleLy = ph > 0 ? dh / ph : scaleY;
+                layouts.forEach(function (lay) {
+                    var pos = lay.position || lay.polygon;
+                    if (!pos || !Array.isArray(pos)) return;
+                    var x, y, w, h;
+                    if (pos.length === 4 && typeof pos[0] === 'number') {
+                        x = pos[0]; y = pos[1]; w = pos[2]; h = pos[3];
+                    } else if (pos.length >= 4 && Array.isArray(pos[0])) {
+                        var xs = pos.map(function (p) { return p[0]; });
+                        var ys = pos.map(function (p) { return p[1]; });
+                        x = Math.min.apply(null, xs);
+                        y = Math.min.apply(null, ys);
+                        w = Math.max.apply(null, xs) - x;
+                        h = Math.max.apply(null, ys) - y;
+                    } else return;
+                    if (w <= 0 || h <= 0) return;
+                    var div = document.createElement('div');
+                    div.className = 'overlay-box ' + getLayoutClass(lay.type);
+                    div.style.left = (x * scaleLx) + 'px';
+                    div.style.top = (y * scaleLy) + 'px';
+                    div.style.width = Math.max(w * scaleLx, 2) + 'px';
+                    div.style.height = Math.max(h * scaleLy, 2) + 'px';
+                    overlayEl.appendChild(div);
+                });
+            }
+
+            function buildPagePanel(page, pageIdx) {
+                var layoutIdToTable = {};
+                var layoutIdToImage = {};
+                (page.tables || []).forEach(function (t) {
+                    if (t.layout_id) layoutIdToTable[t.layout_id] = t;
+                });
+                (page.images || []).forEach(function (img) {
+                    if (img.layout_id) layoutIdToImage[img.layout_id] = img;
+                });
+                var html = '<div class="page-panel' + (pageIdx === 0 ? ' active' : '') + '" data-page-idx="' + pageIdx + '">';
+                html += '<div class="result-panel-title">第 ' + (page.page_num + 1) + ' 页 · ' + escapeHtml(page.page_id || '') + '</div>';
+                if (page.text) {
+                    html += '<div class="result-panel-title" style="margin-top:0.5rem">整页纯文本</div>';
+                    html += '<div class="page-text">' + escapeHtml(page.text) + '</div>';
+                }
+                var layouts = page.layouts || [];
+                if (layouts.length) {
+                    html += '<div class="result-panel-title">版式元素 (layouts)</div>';
+                    html += '<div class="layout-list">';
+                    layouts.forEach(function (lay) {
+                        var type = lay.type || 'text';
+                        var cls = getLayoutClass(type);
+                        var typeCls = 'type-' + cls.replace('layout-', '');
+                        var textPreview = lay.text || '';
+                        if (!textPreview && lay.type === 'table') {
+                            var tbl = layoutIdToTable[lay.layout_id];
+                            if (tbl && tbl.markdown) textPreview = '(表格) ' + (tbl.markdown.substring(0, 80) + '...');
+                        }
+                        if (!textPreview && (lay.type === 'image' || lay.type === 'chart')) {
+                            var img = layoutIdToImage[lay.layout_id];
+                            if (img && img.image_description) textPreview = '(图表描述)';
+                            else textPreview = '(图片)';
+                        }
+                        html += '<div class="layout-item ' + typeCls + '">';
+                        html += '<span class="layout-type-badge">' + escapeHtml(type) + (lay.sub_type ? ' / ' + escapeHtml(lay.sub_type) : '') + '</span>';
+                        html += '<span class="layout-text-preview">' + escapeHtml(textPreview) + '</span>';
+                        html += '</div>';
+                    });
+                    html += '</div>';
+                }
+                if (page.tables && page.tables.length) {
+                    html += '<div class="result-panel-title">表格</div>';
+                    page.tables.forEach(function (t) {
+                        if (t.merge_table) html += '<p class="hint" style="margin-bottom:0.25rem">' + escapeHtml(t.merge_table) + '</p>';
+                        html += '<div class="table-preview">' + mdTableToHtml(t.markdown || '') + '</div>';
+                    });
+                }
+                if (page.images && page.images.length) {
+                    html += '<div class="result-panel-title">图片</div>';
+                    page.images.forEach(function (img) {
+                        if (img.data_url) {
+                            html += '<img class="img-preview" src="' + escapeHtml(img.data_url) + '" alt="解析图片" loading="lazy">';
+                        }
+                        if (img.image_description) {
+                            try {
+                                var desc = JSON.parse(img.image_description);
+                                html += '<div class="img-desc">' + escapeHtml(JSON.stringify(desc, null, 2)) + '</div>';
+                            } catch (e) {
+                                html += '<div class="img-desc">' + escapeHtml(img.image_description) + '</div>';
+                            }
+                        }
+                    });
+                }
+                html += '</div>';
+                return html;
+            }
+
+            function buildVisHtml(data, inputImageUrl) {
+                var res = data.result || {};
+                if (data.error_code && data.error_code !== 0 && data.error_code !== '0') {
+                    return '<div class="vis-card"><p class="error">' + escapeHtml(data.error_msg || data.error || '请求失败') + '</p></div>';
+                }
+                if (res.task_error) {
+                    return '<div class="vis-card"><p class="error">' + escapeHtml(res.task_error) + '</p></div>';
+                }
+                var parseContent = data.parse_content;
+                var html = '<div class="vis-card">';
+                var pages = (parseContent && parseContent.pages) || [];
+                if (parseContent) {
+                    html += '<div class="result-panel-title">' + escapeHtml(parseContent.file_name || '文档') + '（共 ' + pages.length + ' 页）</div>';
+                }
+                if (inputImageUrl && pages.length) {
+                    html += '<div class="vis-legend">';
+                    html += '<span class="vis-legend-item"><span class="vis-legend-dot" style="border-color:#3182ce;background:rgba(49,130,206,0.2)"></span>文本</span>';
+                    html += '<span class="vis-legend-item"><span class="vis-legend-dot" style="border-color:#16a34a;background:rgba(22,163,74,0.2)"></span>表格</span>';
+                    html += '<span class="vis-legend-item"><span class="vis-legend-dot" style="border-color:#dc2626;background:rgba(220,38,38,0.15)"></span>标题</span>';
+                    html += '<span class="vis-legend-item"><span class="vis-legend-dot" style="border-color:#7c3aed;background:rgba(124,58,237,0.15)"></span>图片</span>';
+                    html += '<span class="vis-legend-item"><span class="vis-legend-dot" style="border-color:#ea580c;background:rgba(234,88,12,0.15)"></span>公式</span>';
+                    html += '<span class="vis-legend-item"><span class="vis-legend-dot" style="border-color:#b45309;background:rgba(180,83,9,0.2)"></span>印章</span>';
+                    html += '</div>';
+                    html += '<div class="result-panel-title">原图版式标注（第 1 页）</div>';
+                    html += '<div class="vis-original-wrap"><img class="img-original" src="' + escapeHtml(inputImageUrl) + '" alt="原图"><div class="overlay-boxes"></div></div>';
+                }
+                if (pages.length) {
+                    if (pages.length > 1) {
+                        html += '<div class="page-tabs">';
+                        pages.forEach(function (p, i) {
+                            html += '<button type="button" class="page-tab' + (i === 0 ? ' active' : '') + '" data-page-idx="' + i + '">第 ' + (p.page_num + 1) + ' 页</button>';
+                        });
+                        html += '</div>';
+                    }
+                    html += '<div class="vis-page-panels">';
+                    pages.forEach(function (p, i) {
+                        html += buildPagePanel(p, i);
+                    });
+                    html += '</div>';
+                }
+                if (data.markdown_url) {
+                    html += '<div class="result-panel-title" style="margin-top:1rem">Markdown 结果</div>';
+                    html += '<a href="' + escapeHtml(data.markdown_url) + '" target="_blank" rel="noopener" class="btn-download" style="display:inline-block">下载 Markdown（链接有效期 30 天）</a>';
+                }
+                if (!parseContent && !data.markdown_url) {
+                    html += '<p class="hint">无可视化内容。使用图片输入时可显示版式标注。</p>';
+                }
+                html += '</div>';
+                return html;
+            }
+
+            var lastResultData = null;
+            var lastInputImageUrl = null;
+
+            function downloadJson() {
+                if (!lastResultData) return;
+                var blob = new Blob([JSON.stringify(lastResultData, null, 2)], { type: 'application/json' });
+                var name = 'paddle_vl_parser_result_' + new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '').replace(' ', '_') + '.json';
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = name;
+                a.click();
+                URL.revokeObjectURL(a.href);
+            }
+
+            function showResult(data, inputImageUrl) {
+                lastResultData = data;
+                lastInputImageUrl = inputImageUrl || null;
+                var displayData = JSON.parse(JSON.stringify(data));
+                if (displayData.parse_content) {
+                    displayData.parse_content = displayData.parse_content;
+                }
+                var jsonStr = JSON.stringify(displayData, null, 2);
+                var jsonBlock = '<div class="panel-actions"><span class="result-panel-title">原始 JSON</span><button type="button" class="btn-download" id="btnCopyJson">一键复制</button><button type="button" class="btn-download" id="btnDownloadJson">一键下载</button></div><pre class="json-tree-wrap">' + escapeHtml(jsonStr) + '</pre>';
+                var visHtml = buildVisHtml(data, inputImageUrl);
+                resultEl.innerHTML = '<div class="result-layout">' +
+                    '<div class="result-json">' + jsonBlock + '</div>' +
+                    '<div class="result-vis"><div class="result-panel-title">可视化</div>' + visHtml + '</div>' +
+                    '</div>';
+
+                var btnCopy = resultEl.querySelector('#btnCopyJson');
+                var btnJson = resultEl.querySelector('#btnDownloadJson');
+                if (btnCopy) btnCopy.addEventListener('click', function () {
+                    navigator.clipboard.writeText(JSON.stringify(lastResultData, null, 2)).then(function () {
+                        btnCopy.textContent = '已复制';
+                        setTimeout(function () { btnCopy.textContent = '一键复制'; }, 1500);
+                    });
+                });
+                if (btnJson) btnJson.addEventListener('click', downloadJson);
+
+                if (inputImageUrl && data.parse_content && data.parse_content.pages && data.parse_content.pages.length) {
+                    var wrap = resultEl.querySelector('.vis-original-wrap');
+                    var img = wrap && wrap.querySelector('.img-original');
+                    var overlay = wrap && wrap.querySelector('.overlay-boxes');
+                    if (img && overlay) {
+                        if (img.complete && img.naturalWidth) {
+                            drawOverlayBoxes(img, overlay, data.parse_content.pages, 0);
+                        } else {
+                            img.onload = function () { drawOverlayBoxes(img, overlay, data.parse_content.pages, 0); };
+                        }
+                    }
+                }
+                var pageTabs = resultEl.querySelectorAll('.page-tab');
+                var pagePanels = resultEl.querySelectorAll('.page-panel');
+                pageTabs.forEach(function (tab) {
+                    tab.addEventListener('click', function () {
+                        var idx = parseInt(tab.getAttribute('data-page-idx'), 10);
+                        pageTabs.forEach(function (t) { t.classList.remove('active'); });
+                        pagePanels.forEach(function (p) { p.classList.remove('active'); });
+                        tab.classList.add('active');
+                        var panel = resultEl.querySelector('.page-panel[data-page-idx="' + idx + '"]');
+                        if (panel) panel.classList.add('active');
+                    });
+                });
+            }
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                if (!fileInput.files.length && !fileUrlInput.value.trim()) {
+                    setStatus('请上传文档或填写 file_url', true);
+                    return;
+                }
+                if (fileUrlInput.value.trim() && !document.getElementById('file_name').value.trim()) {
+                    setStatus('使用 file_url 时请填写 file_name', true);
+                    return;
+                }
+
+                var inputImageUrl = null;
+                if (fileInput.files.length) {
+                    var f = fileInput.files[0];
+                    var fname = (f.name || '').toLowerCase();
+                    if (fname.match(/\.(jpg|jpeg|png|bmp|tif|tiff)$/)) {
+                        inputImageUrl = URL.createObjectURL(f);
+                    }
+                }
+
+                submitBtn.disabled = true;
+                setStatus('提交中…');
+                resultEl.innerHTML = '';
+                setStatus('文档解析中，正在轮询结果（约 5～10 秒，文档较大时更久）…');
+
+                var formData = new FormData();
+                formData.append('analysis_chart', document.getElementById('analysis_chart').checked ? 'true' : 'false');
+                formData.append('merge_tables', document.getElementById('merge_tables').checked ? 'true' : 'false');
+                formData.append('relevel_titles', document.getElementById('relevel_titles').checked ? 'true' : 'false');
+                formData.append('recognize_seal', document.getElementById('recognize_seal').checked ? 'true' : 'false');
+                formData.append('return_span_boxes', document.getElementById('return_span_boxes').checked ? 'true' : 'false');
+                if (fileInput.files.length) {
+                    formData.append('file', fileInput.files[0]);
+                } else {
+                    formData.append('file_url', fileUrlInput.value.trim());
+                    formData.append('file_name', document.getElementById('file_name').value.trim() || 'document.pdf');
+                }
+
+                fetch('/api/demo/baidu_paddle_vl_parser', {
+                    method: 'POST',
+                    body: formData
+                })
+                    .then(function (r) {
+                        return r.json().then(function (json) {
+                            if (!r.ok) throw { status: r.status, body: json };
+                            return json;
+                        });
+                    })
+                    .then(function (data) {
+                        setStatus('解析完成');
+                        showResult(data, inputImageUrl);
+                    })
+                    .catch(function (err) {
+                        var msg = err.body && (err.body.error_msg || err.body.error) ? (err.body.error_msg || err.body.error) : (err.message || '请求失败');
+                        setStatus('错误：' + msg, true);
+                        if (err.body) showResult(err.body);
+                    })
+                    .finally(function () {
+                        submitBtn.disabled = false;
+                    });
+            });
+
+            var btnTop = document.getElementById('btnTop');
+            if (btnTop) {
+                function onScroll() { btnTop.classList.toggle('show', window.pageYOffset > 200); }
+                window.addEventListener('scroll', onScroll);
+                btnTop.addEventListener('click', function () { window.scrollTo({ top: 0, behavior: 'smooth' }); });
+            }
+        })();
+    </script>
+</body>
+</html>

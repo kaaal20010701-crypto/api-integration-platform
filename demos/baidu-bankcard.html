@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>百度云 银行卡识别</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        html { height: 100%; margin: 0; overflow: hidden; }
+        body { height: 100%; margin: 0; overflow-y: auto; overflow-x: hidden; padding-bottom: 2rem; -webkit-overflow-scrolling: touch; }
+        .demo-page { padding: 1.5rem 2rem; max-width: 100%; min-height: 100%; box-sizing: border-box; }
+        .demo-page h1 { font-size: 1.5rem; margin-bottom: 0.5rem; color: #1a202c; }
+        .demo-page .desc { color: #4a5568; font-size: 0.9rem; margin-bottom: 1.5rem; line-height: 1.5; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.25rem; font-weight: 500; color: #2d3748; }
+        .form-group input[type="file"],
+        .form-group input[type="text"],
+        .form-group select { margin-right: 0.5rem; }
+        .form-group input[type="text"] { width: 100%; max-width: 400px; padding: 0.5rem; border: 1px solid #cbd5e0; border-radius: 6px; }
+        .form-group select { padding: 0.5rem; border: 1px solid #cbd5e0; border-radius: 6px; min-width: 120px; }
+        .form-group .hint { font-size: 0.8rem; color: #718096; margin-top: 0.25rem; }
+        .form-group input[type="checkbox"] { margin-right: 0.5rem; }
+        .btn { padding: 0.5rem 1rem; background: #3182ce; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem; }
+        .btn:hover { background: #2c5282; }
+        .btn:disabled { background: #a0aec0; cursor: not-allowed; }
+        #result { margin-top: 1.5rem; }
+        .result-layout { display: flex; gap: 1rem; flex-wrap: wrap; align-items: stretch; }
+        .result-json { flex: 1; min-width: 280px; max-width: 50%; }
+        .result-vis { flex: 1; min-width: 280px; max-width: 50%; }
+        .result-panel-title { font-weight: 600; color: #2d3748; margin-bottom: 0.5rem; font-size: 0.9rem; }
+        .vis-card { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.25rem; min-height: 200px; }
+        .bankcard-info { margin-bottom: 1rem; }
+        .bankcard-info-row { display: flex; padding: 0.4rem 0; border-bottom: 1px solid #e2e8f0; font-size: 0.95rem; }
+        .bankcard-info-row:last-child { border-bottom: none; }
+        .bankcard-info-label { min-width: 120px; color: #4a5568; }
+        .bankcard-info-value { color: #2d3748; font-weight: 500; }
+        .vis-original-wrap { position: relative; display: inline-block; max-width: 100%; margin-top: 0.75rem; }
+        .vis-original-wrap .img-original { display: block; max-width: 100%; height: auto; vertical-align: top; }
+        .vis-original-wrap .overlay-boxes { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+        .vis-original-wrap .overlay-box { position: absolute; box-sizing: border-box; border: 2px solid #2b6cb0; background: rgba(43,108,176,0.15); }
+        .vis-original-wrap .overlay-label { position: absolute; font-size: 0.65rem; color: #fff; background: #2b6cb0; padding: 1px 4px; white-space: nowrap; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+        .json-tree-wrap { background: #2d3748; color: #e2e8f0; border-radius: 8px; padding: 0.75rem 1rem; font-family: monospace; font-size: 0.8rem; max-height: 520px; overflow: auto; margin: 0; white-space: pre-wrap; word-break: break-all; }
+        .panel-actions { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
+        .panel-actions .result-panel-title { margin-bottom: 0; margin-right: auto; }
+        .btn-download { padding: 0.35rem 0.75rem; font-size: 0.85rem; background: #4a5568; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+        .btn-download:hover { background: #2d3748; }
+        .status { margin-top: 0.5rem; color: #718096; }
+        .error { color: #c53030; }
+        .btn-top { position: fixed; right: 1.5rem; bottom: 1.5rem; width: 40px; height: 40px; border-radius: 50%; background: #3182ce; color: #fff; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: none; align-items: center; justify-content: center; font-size: 1.2rem; line-height: 1; z-index: 100; }
+        .btn-top.show { display: flex; }
+        .btn-top:hover { background: #2c5282; }
+        .meta-row { font-size: 0.85rem; color: #4a5568; padding: 0.25rem 0; }
+    </style>
+</head>
+<body>
+    <div class="demo-page">
+        <h1>百度云 银行卡识别</h1>
+        <p class="desc">
+            支持对主流银行卡的卡号、有效期、发卡行、卡片类型、持卡人、银行卡号位置 6 个关键字段进行结构化识别，识别准确率超过 99%。同时支持返回银行卡号的字段位置坐标，及开启银行卡质量类型检测。
+        </p>
+        <form id="form">
+            <div class="form-group">
+                <label for="file">上传图片</label>
+                <input type="file" id="file" name="file" accept="image/jpeg,image/jpg,image/png,image/bmp">
+                <p class="hint">与下方 URL 二选一，上传优先。最短边≥15px，最长边≤8192px，支持 jpg/png/bmp。</p>
+            </div>
+            <div class="form-group">
+                <label for="url">或图片 URL</label>
+                <input type="text" id="url" name="url" placeholder="https://...">
+                <p class="hint">请关闭 URL 防盗链。</p>
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" id="location" name="location" value="true"> location（是否返回银行卡号位置坐标）</label>
+                <p class="hint">开启后返回 bank_card_number_location，可用于在原图上标注卡号区域。</p>
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" id="detect_quality" name="detect_quality" value="true"> detect_quality（银行卡质量类型检测）</label>
+                <p class="hint">检测清晰模糊、边框/四角是否完整。</p>
+            </div>
+            <button type="submit" class="btn" id="submitBtn">提交</button>
+        </form>
+        <p class="status" id="status"></p>
+        <div id="result"></div>
+        <button type="button" class="btn-top" id="btnTop" title="回到顶部">↑</button>
+    </div>
+    <script>
+        (function () {
+            var BANK_CARD_TYPE = {
+                0: '不能识别',
+                1: '借记卡',
+                2: '贷记卡',
+                3: '准贷记卡',
+                4: '预付费卡'
+            };
+
+            var form = document.getElementById('form');
+            var submitBtn = document.getElementById('submitBtn');
+            var statusEl = document.getElementById('status');
+            var resultEl = document.getElementById('result');
+
+            function setStatus(msg, isError) {
+                statusEl.textContent = msg;
+                statusEl.className = 'status' + (isError ? ' error' : '');
+            }
+
+            function escapeHtml(s) {
+                if (s == null) return '';
+                var div = document.createElement('div');
+                div.textContent = s;
+                return div.innerHTML;
+            }
+
+            function buildVisHtml(data, inputImageUrl) {
+                if (data.error_code && data.error_code !== 0 && data.error_code !== '0') {
+                    return '<div class="vis-card"><p class="error">' + escapeHtml(data.error_msg || data.error || '请求失败') + '</p></div>';
+                }
+                var res = data.result || {};
+                var html = '<div class="vis-card">';
+                html += '<div class="bankcard-info">';
+                var fields = [
+                    ['bank_card_number', '银行卡号'],
+                    ['valid_date', '有效期'],
+                    ['bank_card_type', '卡片类型'],
+                    ['bank_name', '发卡行'],
+                    ['holder_name', '持卡人']
+                ];
+                for (var i = 0; i < fields.length; i++) {
+                    var key = fields[i][0];
+                    var label = fields[i][1];
+                    var val = res[key];
+                    if (val !== undefined && val !== null && val !== '') {
+                        if (key === 'bank_card_type') {
+                            val = BANK_CARD_TYPE[val] || val;
+                        }
+                        html += '<div class="bankcard-info-row"><span class="bankcard-info-label">' + escapeHtml(label) + '</span><span class="bankcard-info-value">' + escapeHtml(String(val)) + '</span></div>';
+                    }
+                }
+                html += '</div>';
+
+                if (data.direction !== undefined) {
+                    html += '<div class="meta-row">图像方向 direction: ' + escapeHtml(data.direction) + '</div>';
+                }
+                if (res.card_quality) {
+                    var cq = res.card_quality;
+                    html += '<div class="meta-row">card_quality: IsClear=' + escapeHtml(cq.IsClear) + ' IsComplete=' + escapeHtml(cq.IsComplete) + '</div>';
+                }
+
+                var hasLocation = res.bank_card_number_location && (res.bank_card_number_location.left != null || res.bank_card_number_location.width != null);
+                if (inputImageUrl) {
+                    html += '<div class="result-panel-title">' + (hasLocation ? '卡号区域标注' : '输入图片') + '</div>';
+                    html += '<div class="vis-original-wrap"><img class="img-original" src="' + escapeHtml(inputImageUrl) + '" alt="原图"><div class="overlay-boxes"></div></div>';
+                }
+                html += '</div>';
+                return html;
+            }
+
+            function drawOverlayBox(imgEl, overlayEl, loc, label) {
+                if (!loc || !imgEl || !overlayEl) return;
+                var nw = imgEl.naturalWidth;
+                var nh = imgEl.naturalHeight;
+                var dw = imgEl.offsetWidth;
+                var dh = imgEl.offsetHeight;
+                if (!nw || !nh) return;
+                var left = parseFloat(String(loc.left)) || 0;
+                var top = parseFloat(String(loc.top)) || 0;
+                var width = parseFloat(String(loc.width)) || 0;
+                var height = parseFloat(String(loc.height)) || 0;
+                if (width <= 0 || height <= 0) return;
+                var scaleX = dw / nw;
+                var scaleY = dh / nh;
+                var div = document.createElement('div');
+                div.className = 'overlay-box';
+                div.style.left = (left * scaleX) + 'px';
+                div.style.top = (top * scaleY) + 'px';
+                div.style.width = Math.max(width * scaleX, 2) + 'px';
+                div.style.height = Math.max(height * scaleY, 2) + 'px';
+                overlayEl.appendChild(div);
+                var labelEl = document.createElement('div');
+                labelEl.className = 'overlay-label';
+                labelEl.textContent = label || '银行卡号';
+                labelEl.style.left = (left * scaleX) + 'px';
+                labelEl.style.top = Math.max((top * scaleY) - 16, 0) + 'px';
+                overlayEl.appendChild(labelEl);
+            }
+
+            var lastResultData = null;
+            var lastInputImageUrl = null;
+
+            function downloadJson() {
+                if (!lastResultData) return;
+                var blob = new Blob([JSON.stringify(lastResultData, null, 2)], { type: 'application/json' });
+                var name = 'bankcard_result_' + new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '').replace(' ', '_') + '.json';
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = name;
+                a.click();
+                URL.revokeObjectURL(a.href);
+            }
+
+            function downloadVis() {
+                var wrap = resultEl.querySelector('.vis-original-wrap');
+                var img = wrap && wrap.querySelector('.img-original');
+                if (!img || !img.complete || !img.naturalWidth) {
+                    if (lastInputImageUrl) {
+                        var a = document.createElement('a');
+                        a.href = lastInputImageUrl;
+                        a.download = 'bankcard_original.png';
+                        a.target = '_blank';
+                        a.click();
+                    }
+                    return;
+                }
+                try {
+                    var canvas = document.createElement('canvas');
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
+                    var ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    var loc = lastResultData && lastResultData.result && lastResultData.result.bank_card_number_location;
+                    if (loc) {
+                        var l = parseFloat(loc.left) || 0;
+                        var t = parseFloat(loc.top) || 0;
+                        var w = parseFloat(loc.width) || 0;
+                        var h = parseFloat(loc.height) || 0;
+                        if (w > 0 && h > 0) {
+                            ctx.strokeStyle = '#2b6cb0';
+                            ctx.lineWidth = Math.max(2, Math.min(canvas.width, canvas.height) / 300);
+                            ctx.fillStyle = 'rgba(43,108,176,0.2)';
+                            ctx.strokeRect(l, t, w, h);
+                            ctx.fillRect(l, t, w, h);
+                        }
+                    }
+                    var dataUrl = canvas.toDataURL('image/png');
+                    var a = document.createElement('a');
+                    a.href = dataUrl;
+                    a.download = 'bankcard_annotated_' + new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '').replace(' ', '_') + '.png';
+                    a.click();
+                } catch (e) {
+                    if (lastInputImageUrl) {
+                        var a = document.createElement('a');
+                        a.href = lastInputImageUrl;
+                        a.download = 'bankcard_original.png';
+                        a.target = '_blank';
+                        a.click();
+                    }
+                }
+            }
+
+            function showResult(data, inputImageUrl) {
+                lastResultData = data;
+                lastInputImageUrl = inputImageUrl || null;
+                var jsonStr = JSON.stringify(data, null, 2);
+                var jsonBlock = '<div class="panel-actions"><span class="result-panel-title">原始 JSON</span><button type="button" class="btn-download" id="btnCopyJson">一键复制</button><button type="button" class="btn-download" id="btnDownloadJson">一键下载</button></div><pre class="json-tree-wrap">' + escapeHtml(jsonStr) + '</pre>';
+                var visHtml = buildVisHtml(data, inputImageUrl);
+                resultEl.innerHTML = '<div class="result-layout">' +
+                    '<div class="result-json">' + jsonBlock + '</div>' +
+                    '<div class="result-vis"><div class="panel-actions"><span class="result-panel-title">识别结果</span><button type="button" class="btn-download" id="btnDownloadVis">下载标注图</button></div>' + visHtml + '</div>' +
+                    '</div>';
+
+                var btnCopy = resultEl.querySelector('#btnCopyJson');
+                var btnJson = resultEl.querySelector('#btnDownloadJson');
+                var btnVis = resultEl.querySelector('#btnDownloadVis');
+                if (btnCopy) btnCopy.addEventListener('click', function () {
+                    navigator.clipboard.writeText(JSON.stringify(lastResultData, null, 2)).then(function () {
+                        btnCopy.textContent = '已复制';
+                        setTimeout(function () { btnCopy.textContent = '一键复制'; }, 1500);
+                    });
+                });
+                if (btnJson) btnJson.addEventListener('click', downloadJson);
+                if (btnVis) btnVis.addEventListener('click', downloadVis);
+
+                if (inputImageUrl && data.result && data.result.bank_card_number_location) {
+                    var wrap = resultEl.querySelector('.vis-original-wrap');
+                    var img = wrap && wrap.querySelector('.img-original');
+                    var overlay = wrap && wrap.querySelector('.overlay-boxes');
+                    if (img && overlay) {
+                        if (img.complete && img.naturalWidth) {
+                            drawOverlayBox(img, overlay, data.result.bank_card_number_location, '银行卡号');
+                        } else {
+                            img.onload = function () { drawOverlayBox(img, overlay, data.result.bank_card_number_location, '银行卡号'); };
+                        }
+                    }
+                }
+            }
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                var fileInput = document.getElementById('file');
+                var urlInput = document.getElementById('url');
+                if (!fileInput.files.length && !urlInput.value.trim()) {
+                    setStatus('请上传图片或填写图片 URL', true);
+                    return;
+                }
+
+                var inputImageUrl = null;
+                if (fileInput.files.length) {
+                    var f = fileInput.files[0];
+                    var fname = (f.name || '').toLowerCase();
+                    if (fname.match(/\.(jpe?g|png|bmp)$/)) {
+                        inputImageUrl = URL.createObjectURL(f);
+                    }
+                } else if (urlInput.value.trim()) {
+                    inputImageUrl = urlInput.value.trim();
+                }
+
+                submitBtn.disabled = true;
+                setStatus('识别中…');
+                resultEl.innerHTML = '';
+
+                var formData = new FormData();
+                formData.append('location', document.getElementById('location').checked ? 'true' : 'false');
+                formData.append('detect_quality', document.getElementById('detect_quality').checked ? 'true' : 'false');
+                if (fileInput.files.length) formData.append('file', fileInput.files[0]);
+                else formData.append('url', urlInput.value.trim());
+
+                fetch('/api/demo/baidu_bankcard', {
+                    method: 'POST',
+                    body: formData
+                })
+                    .then(function (r) {
+                        return r.json().then(function (json) {
+                            if (!r.ok) throw { status: r.status, body: json };
+                            return json;
+                        });
+                    })
+                    .then(function (data) {
+                        setStatus('识别完成');
+                        showResult(data, inputImageUrl);
+                    })
+                    .catch(function (err) {
+                        var msg = err.body && (err.body.error_msg || err.body.error) ? (err.body.error_msg || err.body.error) : (err.message || '请求失败');
+                        setStatus('错误：' + msg, true);
+                        if (err.body) showResult(err.body, inputImageUrl);
+                    })
+                    .finally(function () {
+                        submitBtn.disabled = false;
+                    });
+            });
+
+            var btnTop = document.getElementById('btnTop');
+            if (btnTop) {
+                function onScroll() { btnTop.classList.toggle('show', window.pageYOffset > 200); }
+                window.addEventListener('scroll', onScroll);
+                btnTop.addEventListener('click', function () { window.scrollTo({ top: 0, behavior: 'smooth' }); });
+            }
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+---
+description: 修改 skill 时更新修改时间
+alwaysApply: true
+---
+
+# Skill 修改约定
+
+当修改 `~/.cursor/skills/` 下任一集成平台相关 skill 文件（如 frontend-backend-architecture-skill、visualization-skill、integration-skill、vendor-api-skill、delete-api-platform-skill 等）时，**必须**将该文件末尾的「修改时间」更新为当前日期时间，格式：`YYYY-MM-DD HH:MM`（精确到分钟）。

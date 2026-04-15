@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>百度云智能作业批改</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        html { height: 100%; margin: 0; overflow: hidden; }
+        body { height: 100%; margin: 0; overflow-y: auto; overflow-x: hidden; padding-bottom: 2rem; -webkit-overflow-scrolling: touch; }
+        .demo-page { padding: 1.5rem 2rem; max-width: 100%; min-height: 100%; box-sizing: border-box; }
+        .demo-page h1 { font-size: 1.5rem; margin-bottom: 0.5rem; color: #1a202c; }
+        .demo-page .desc { color: #4a5568; font-size: 0.9rem; margin-bottom: 1.5rem; line-height: 1.5; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.25rem; font-weight: 500; color: #2d3748; }
+        .form-group input[type="file"],
+        .form-group input[type="text"],
+        .form-group input[type="checkbox"] { margin-right: 0.5rem; }
+        .form-group input[type="text"] { width: 100%; max-width: 400px; padding: 0.5rem; border: 1px solid #cbd5e0; border-radius: 6px; }
+        .form-group .hint { font-size: 0.8rem; color: #718096; margin-top: 0.25rem; }
+        .btn { padding: 0.5rem 1rem; background: #3182ce; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem; }
+        .btn:hover { background: #2c5282; }
+        .btn:disabled { background: #a0aec0; cursor: not-allowed; }
+        #result { margin-top: 1.5rem; }
+        .result-layout { display: flex; gap: 1rem; flex-wrap: wrap; align-items: stretch; }
+        .result-json { flex: 1; min-width: 280px; max-width: 50%; }
+        .result-vis { flex: 1; min-width: 280px; max-width: 50%; }
+        .result-panel-title { font-weight: 600; color: #2d3748; margin-bottom: 0.5rem; font-size: 0.9rem; }
+        .vis-card { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.25rem; min-height: 200px; }
+        .vis-stat { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .vis-stat-item { background: #edf2f7; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.9rem; }
+        .vis-subject { font-weight: 600; color: #2b6cb0; margin: 1rem 0 0.5rem; }
+        .q-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.75rem 1rem; margin-bottom: 0.75rem; }
+        .q-card.correct { border-left: 4px solid #38a169; }
+        .q-card.wrong { border-left: 4px solid #e53e3e; }
+        .q-card.unmarked { border-left: 4px solid #718096; }
+        .q-card.no-answer { border-left: 4px solid #d69e2e; }
+        .q-head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
+        .q-tag { font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 4px; }
+        .q-tag.correct { background: #c6f6d5; color: #276749; }
+        .q-tag.wrong { background: #fed7d7; color: #c53030; }
+        .q-tag.unmarked { background: #e2e8f0; color: #4a5568; }
+        .q-tag.no-answer { background: #feebc8; color: #c05621; }
+        .q-text { font-size: 0.9rem; color: #2d3748; margin-bottom: 0.5rem; }
+        .slot-item { font-size: 0.85rem; color: #4a5568; margin-top: 0.35rem; padding-left: 0.75rem; border-left: 2px solid #e2e8f0; }
+        .slot-reason { color: #718096; font-size: 0.8rem; margin-top: 0.2rem; }
+        .crop-img { max-width: 100%; max-height: 200px; border-radius: 4px; margin-top: 0.5rem; }
+        /* 原图打框 */
+        .vis-original-wrap { position: relative; display: inline-block; max-width: 100%; margin-bottom: 1rem; }
+        .vis-original-wrap .img-original { display: block; max-width: 100%; height: auto; vertical-align: top; }
+        .vis-original-wrap .overlay-boxes { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+        .vis-original-wrap .overlay-box { position: absolute; box-sizing: border-box; border-width: 2px; border-style: solid; }
+        .vis-original-wrap .overlay-box.q-area { border-radius: 4px; }
+        .vis-original-wrap .overlay-box.slot-area { border-style: dashed; }
+        .vis-original-wrap .overlay-box.correct { border-color: #38a169; background: rgba(56,161,105,0.15); }
+        .vis-original-wrap .overlay-box.wrong { border-color: #e53e3e; background: rgba(229,62,62,0.15); }
+        .vis-original-wrap .overlay-box.no-answer { border-color: #d69e2e; background: rgba(214,158,46,0.15); }
+        .vis-original-wrap .overlay-box.unmarked { border-color: #718096; background: rgba(113,128,150,0.1); }
+        /* JSON 树形：每个节点可折叠 */
+        .json-tree-wrap { background: #2d3748; color: #e2e8f0; border-radius: 8px; padding: 0.75rem 1rem; font-family: monospace; font-size: 0.8rem; max-height: 520px; overflow: auto; }
+        .json-tree-node { margin-left: 0; }
+        .json-tree-node .json-tree-children { margin-left: 1.2em; }
+        .json-tree-toggle { cursor: pointer; user-select: none; display: inline-block; width: 1em; text-align: center; }
+        .json-tree-toggle::before { content: '▶'; }
+        .json-tree-node.open > .json-tree-head .json-tree-toggle::before { content: '▼'; }
+        .json-tree-node.open > .json-tree-children { display: block; }
+        .json-tree-node > .json-tree-children { display: none; }
+        .json-tree-head { white-space: nowrap; }
+        .json-tree-key { color: #90cdf4; }
+        .json-tree-key::after { content: ': '; color: #e2e8f0; }
+        .json-tree-prim { color: #f6e05e; }
+        .json-tree-null { color: #a0aec0; }
+        .json-tree-summary { color: #a0aec0; margin-left: 0.2em; }
+        .panel-actions { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
+        .panel-actions .result-panel-title { margin-bottom: 0; margin-right: auto; }
+        .btn-download { padding: 0.35rem 0.75rem; font-size: 0.85rem; background: #4a5568; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+        .btn-download:hover { background: #2d3748; }
+        .status { margin-top: 0.5rem; color: #718096; }
+        .error { color: #c53030; }
+        .btn-top { position: fixed; right: 1.5rem; bottom: 1.5rem; width: 40px; height: 40px; border-radius: 50%; background: #3182ce; color: #fff; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: none; align-items: center; justify-content: center; font-size: 1.2rem; line-height: 1; z-index: 100; }
+        .btn-top.show { display: flex; }
+        .btn-top:hover { background: #2c5282; }
+    </style>
+</head>
+<body>
+    <div class="demo-page">
+        <h1>百度云智能作业批改</h1>
+        <p class="desc">
+            基于多模态大模型实现 K12 全学科作业、试卷批改。支持拍照或上传图片，输出每道题的批改结果；支持数学和理综解析；支持结果原图渲染与题目区域对错标识。
+        </p>
+        <form id="form">
+            <div class="form-group">
+                <label for="file">上传图片</label>
+                <input type="file" id="file" name="file" accept="image/jpeg,image/jpg,image/png,image/bmp">
+                <p class="hint">与下方 URL 二选一，上传优先。最短边≥512px，最长边≤8192px，支持 jpg/png/bmp。</p>
+            </div>
+            <div class="form-group">
+                <label for="url">或图片 URL</label>
+                <input type="text" id="url" name="url" placeholder="https://...">
+                <p class="hint">请关闭 URL 防盗链。</p>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="only_split" name="only_split" value="true">
+                    仅题目切分（同步返回，不进行批改）
+                </label>
+                <p class="hint">不勾选则为端到端批改（异步，约 5～10 秒轮询）。</p>
+            </div>
+            <button type="submit" class="btn" id="submitBtn">提交</button>
+        </form>
+        <p class="status" id="status"></p>
+        <div id="result"></div>
+        <button type="button" class="btn-top" id="btnTop" title="回到顶部">↑</button>
+    </div>
+    <script>
+        (function () {
+            var SUBJECT_MAP = { chinese: '语文', math: '数学', english: '英语', physics: '物理', chemistry: '化学', biology: '生物', history: '历史', geography: '地理', politics: '政治' };
+            var CORRECT_MAP = { 0: { text: '未批', cls: 'unmarked' }, 1: { text: '正确', cls: 'correct' }, 2: { text: '错误', cls: 'wrong' }, 3: { text: '未作答', cls: 'no-answer' } };
+
+            var form = document.getElementById('form');
+            var submitBtn = document.getElementById('submitBtn');
+            var statusEl = document.getElementById('status');
+            var resultEl = document.getElementById('result');
+
+            function setStatus(msg, isError) {
+                statusEl.textContent = msg;
+                statusEl.className = 'status' + (isError ? ' error' : '');
+            }
+
+            function escapeHtml(s) {
+                if (s == null) return '';
+                var div = document.createElement('div');
+                div.textContent = s;
+                return div.innerHTML;
+            }
+
+            function buildVisHtml(data) {
+                if (data.error_code && data.error_code !== 0 && data.error_code !== '0') {
+                    return '<div class="vis-card"><p class="error">' + escapeHtml(data.error_msg || data.error || '请求失败') + '</p></div>';
+                }
+                var stat = data.stat_result || {};
+                var html = '<div class="vis-card">';
+                html += '<div class="vis-stat">';
+                html += '<span class="vis-stat-item">共 ' + (stat.all || 0) + ' 题</span>';
+                html += '<span class="vis-stat-item">已批 ' + (stat.corrected || 0) + ' 题</span>';
+                if ((stat.correcting || 0) > 0) html += '<span class="vis-stat-item">批改中 ' + stat.correcting + ' 题</span>';
+                html += '</div>';
+                var imageResults = data.imageResults || [];
+                if (imageResults.length > 0 && imageResults[0].imageUrl) {
+                    html += '<div class="result-panel-title">原图标注</div>';
+                    html += '<div class="vis-original-wrap"><img class="img-original" src="' + escapeHtml(imageResults[0].imageUrl) + '" alt="原图"><div class="overlay-boxes"></div></div>';
+                }
+                imageResults.forEach(function (img) {
+                    var subject = SUBJECT_MAP[img.paperSubject] || img.paperSubject || '';
+                    if (subject) html += '<div class="vis-subject">学科：' + escapeHtml(subject) + '</div>';
+                    var results = img.result || [];
+                    results.forEach(function (r) {
+                        var cr = CORRECT_MAP[r.correctResult] || CORRECT_MAP[0];
+                        var cardCls = 'q-card ' + cr.cls;
+                        html += '<div class="' + cardCls + '">';
+                        html += '<div class="q-head">';
+                        html += '<span class="q-tag ' + cr.cls + '">第 ' + ((r.seqence != null ? r.seqence : 0) + 1) + ' 题 · ' + cr.text + '</span>';
+                        html += '</div>';
+                        if (r.question) html += '<div class="q-text">' + escapeHtml(r.question) + '</div>';
+                        var slots = r.slot || [];
+                        slots.forEach(function (s) {
+                            var sc = CORRECT_MAP[s.correctResult] || CORRECT_MAP[0];
+                            html += '<div class="slot-item">作答区 ' + (s.seqence || '') + '：<span class="q-tag ' + sc.cls + '">' + sc.text + '</span>';
+                            if (s.reason) html += '<div class="slot-reason">' + escapeHtml(s.reason) + '</div>';
+                            html += '</div>';
+                        });
+                        if (r.cropUrl) html += '<img class="crop-img" src="' + escapeHtml(r.cropUrl) + '" alt="题目图" loading="lazy">';
+                        html += '</div>';
+                    });
+                });
+                if (imageResults.length === 0 && !data.result) html += '<p class="hint">无批改结果</p>';
+                html += '</div>';
+                return html;
+            }
+
+            function drawOverlayBoxes(imgEl, overlayEl, imageResult) {
+                var nw = imgEl.naturalWidth;
+                var nh = imgEl.naturalHeight;
+                var dw = imgEl.offsetWidth;
+                var dh = imgEl.offsetHeight;
+                if (!nw || !nh) return;
+                var scaleX = dw / nw;
+                var scaleY = dh / nh;
+                function rect(area) {
+                    if (!area || (area.left_x === undefined && area.left_x === undefined)) return null;
+                    var lx = area.left_x != null ? area.left_x : 0;
+                    var ly = area.left_y != null ? area.left_y : 0;
+                    var rx = area.right_x != null ? area.right_x : lx;
+                    var ry = area.right_y != null ? area.right_y : ly;
+                    return { left: lx * scaleX, top: ly * scaleY, width: (rx - lx) * scaleX, height: (ry - ly) * scaleY };
+                }
+                function addBox(r, cls, isSlot) {
+                    var area = r.left_x !== undefined ? r : (r.questionArea && r.questionArea[0]) || (r.handwritingArea);
+                    var r2 = rect(area);
+                    if (!r2) return;
+                    var div = document.createElement('div');
+                    div.className = 'overlay-box ' + cls + (isSlot ? ' slot-area' : ' q-area');
+                    div.style.left = r2.left + 'px';
+                    div.style.top = r2.top + 'px';
+                    div.style.width = Math.max(r2.width, 2) + 'px';
+                    div.style.height = Math.max(r2.height, 2) + 'px';
+                    overlayEl.appendChild(div);
+                }
+                var results = imageResult.result || [];
+                results.forEach(function (r) {
+                    var cr = CORRECT_MAP[r.correctResult] || CORRECT_MAP[0];
+                    var qa = r.questionArea && r.questionArea[0];
+                    if (qa) addBox(qa, cr.cls, false);
+                    (r.slot || []).forEach(function (s) {
+                        var sc = CORRECT_MAP[s.correctResult] || CORRECT_MAP[0];
+                        addBox(s.handwritingArea || s, sc.cls, true);
+                    });
+                });
+            }
+
+            function buildJsonTreeHtml(obj) {
+                function cls(v) {
+                    if (v === null) return 'json-tree-null';
+                    if (typeof v === 'number' || typeof v === 'boolean') return 'json-tree-prim';
+                    return '';
+                }
+                function primStr(v) {
+                    if (v === null) return 'null';
+                    if (typeof v === 'string') return '"' + escapeHtml(v) + '"';
+                    return String(v);
+                }
+                function node(key, val, isRoot) {
+                    var keyPart = key !== undefined ? '<span class="json-tree-key">' + escapeHtml(String(key)) + '</span>' : '';
+                    if (val === null || typeof val !== 'object') {
+                        return '<div class="json-tree-node"><span class="json-tree-head">' + keyPart + '<span class="' + cls(val) + '">' + primStr(val) + '</span></span></div>';
+                    }
+                    var isArr = Array.isArray(val);
+                    var summary = isArr ? ('[' + val.length + ']') : ('{...}');
+                    var children = '';
+                    if (isArr) {
+                        val.forEach(function (item, i) {
+                            children += node(i, item, false);
+                        });
+                    } else {
+                        Object.keys(val).forEach(function (k) {
+                            children += node(k, val[k], false);
+                        });
+                    }
+                    var toggle = '<span class="json-tree-toggle"></span>';
+                    var rootClass = isRoot ? ' json-tree-node open' : ' json-tree-node';
+                    return '<div class="' + rootClass.trim() + '">' +
+                        '<span class="json-tree-head">' + toggle + keyPart +
+                        '<span class="json-tree-summary">' + summary + '</span></span>' +
+                        '<div class="json-tree-children">' + children + '</div></div>';
+                }
+                return node(undefined, obj, true);
+            }
+
+            function bindJsonTreeToggle(container) {
+                if (!container) return;
+                container.querySelectorAll('.json-tree-node').forEach(function (el) {
+                    var head = el.querySelector('.json-tree-head');
+                    if (!head) return;
+                    head.style.cursor = 'pointer';
+                    head.addEventListener('click', function () { el.classList.toggle('open'); });
+                });
+            }
+
+            var lastResultData = null;
+
+            function downloadJson() {
+                if (!lastResultData) return;
+                var blob = new Blob([JSON.stringify(lastResultData, null, 2)], { type: 'application/json' });
+                var name = 'correct_edu_result_' + new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '').replace(' ', '_') + '.json';
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = name;
+                a.click();
+                URL.revokeObjectURL(a.href);
+            }
+
+            function downloadVis() {
+                if (!lastResultData) return;
+                var url = (lastResultData.imageResults && lastResultData.imageResults[0] && lastResultData.imageResults[0].imageUrl) || '';
+                var wrap = resultEl.querySelector('.vis-original-wrap');
+                var img = wrap && wrap.querySelector('.img-original');
+                if (!img || !img.complete || !img.naturalWidth) {
+                    if (url) { var a = document.createElement('a'); a.href = url; a.download = 'correct_edu_original.png'; a.target = '_blank'; a.click(); }
+                    return;
+                }
+                try {
+                    var canvas = document.createElement('canvas');
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
+                    var ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    var imageResult = lastResultData.imageResults && lastResultData.imageResults[0];
+                    if (imageResult && imageResult.result) {
+                        var colors = { correct: '#38a169', wrong: '#e53e3e', 'no-answer': '#d69e2e', unmarked: '#718096' };
+                        function drawRect(area, cls, dashed) {
+                            if (!area || (area.left_x === undefined && area.right_x === undefined)) return;
+                            var lx = area.left_x != null ? area.left_x : 0, ly = area.left_y != null ? area.left_y : 0;
+                            var rx = area.right_x != null ? area.right_x : lx, ry = area.right_y != null ? area.right_y : ly;
+                            ctx.strokeStyle = colors[cls] || colors.unmarked;
+                            ctx.lineWidth = Math.max(2, Math.min(canvas.width, canvas.height) / 300);
+                            ctx.setLineDash(dashed ? [6, 4] : []);
+                            ctx.strokeRect(lx, ly, rx - lx, ry - ly);
+                            ctx.fillStyle = (colors[cls] || colors.unmarked) + '20';
+                            ctx.fillRect(lx, ly, rx - lx, ry - ly);
+                        }
+                        imageResult.result.forEach(function (r) {
+                            var cr = (CORRECT_MAP[r.correctResult] || CORRECT_MAP[0]).cls;
+                            if (r.questionArea && r.questionArea[0]) drawRect(r.questionArea[0], cr, false);
+                            (r.slot || []).forEach(function (s) {
+                                var sc = (CORRECT_MAP[s.correctResult] || CORRECT_MAP[0]).cls;
+                                drawRect(s.handwritingArea || s, sc, true);
+                            });
+                        });
+                    }
+                    var dataUrl = canvas.toDataURL('image/png');
+                    var a = document.createElement('a');
+                    a.href = dataUrl;
+                    a.download = 'correct_edu_annotated_' + new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '').replace(' ', '_') + '.png';
+                    a.click();
+                } catch (e) {
+                    if (url) { var a = document.createElement('a'); a.href = url; a.download = 'correct_edu_original.png'; a.target = '_blank'; a.click(); }
+                }
+            }
+
+            function showResult(data) {
+                lastResultData = data;
+                var jsonTreeHtml = buildJsonTreeHtml(data);
+                var jsonBlock = '<div class="panel-actions"><span class="result-panel-title">原始 JSON（点击节点展开/折叠）</span><button type="button" class="btn-download" id="btnDownloadJson">一键下载</button></div><div class="json-tree-wrap">' + jsonTreeHtml + '</div>';
+                var visHtml = buildVisHtml(data);
+                resultEl.innerHTML = '<div class="result-layout">' +
+                    '<div class="result-json">' + jsonBlock + '</div>' +
+                    '<div class="result-vis"><div class="panel-actions"><span class="result-panel-title">批改结果</span><button type="button" class="btn-download" id="btnDownloadVis">下载标注图</button></div>' + visHtml + '</div>' +
+                    '</div>';
+                bindJsonTreeToggle(resultEl.querySelector('.json-tree-wrap'));
+                var btnJson = resultEl.querySelector('#btnDownloadJson');
+                var btnVis = resultEl.querySelector('#btnDownloadVis');
+                if (btnJson) btnJson.addEventListener('click', downloadJson);
+                if (btnVis) btnVis.addEventListener('click', downloadVis);
+                var imageResults = data.imageResults || [];
+                if (imageResults.length > 0 && imageResults[0].imageUrl) {
+                    var wrap = resultEl.querySelector('.vis-original-wrap');
+                    var img = wrap && wrap.querySelector('.img-original');
+                    var overlay = wrap && wrap.querySelector('.overlay-boxes');
+                    if (img && overlay) {
+                        if (img.complete && img.naturalWidth) drawOverlayBoxes(img, overlay, imageResults[0]);
+                        else img.onload = function () { drawOverlayBoxes(img, overlay, imageResults[0]); };
+                    }
+                }
+            }
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                var fileInput = document.getElementById('file');
+                var urlInput = document.getElementById('url');
+                if (!fileInput.files.length && !urlInput.value.trim()) {
+                    setStatus('请上传图片或填写图片 URL', true);
+                    return;
+                }
+                submitBtn.disabled = true;
+                setStatus('提交中…');
+                resultEl.innerHTML = '';
+
+                var formData = new FormData();
+                formData.append('only_split', document.getElementById('only_split').checked ? 'true' : 'false');
+                if (fileInput.files.length) formData.append('file', fileInput.files[0]);
+                else formData.append('url', urlInput.value.trim());
+
+                if (document.getElementById('only_split').checked) {
+                    setStatus('仅题目切分，同步返回…');
+                } else {
+                    setStatus('端到端批改，正在轮询结果（约 5～10 秒）…');
+                }
+
+                fetch('/api/demo/baidu_correct_edu', {
+                    method: 'POST',
+                    body: formData
+                })
+                    .then(function (r) {
+                        return r.json().then(function (json) {
+                            if (!r.ok) throw { status: r.status, body: json };
+                            return json;
+                        });
+                    })
+                    .then(function (data) {
+                        setStatus('批改完成');
+                        showResult(data);
+                    })
+                    .catch(function (err) {
+                        var msg = err.body && (err.body.error_msg || err.body.error) ? (err.body.error_msg || err.body.error) : (err.message || '请求失败');
+                        setStatus('错误：' + msg, true);
+                        if (err.body) showResult(err.body);
+                    })
+                    .finally(function () {
+                        submitBtn.disabled = false;
+                    });
+            });
+
+            var btnTop = document.getElementById('btnTop');
+            if (btnTop) {
+                function onScroll() { btnTop.classList.toggle('show', window.pageYOffset > 200); }
+                window.addEventListener('scroll', onScroll);
+                btnTop.addEventListener('click', function () { window.scrollTo({ top: 0, behavior: 'smooth' }); });
+            }
+        })();
+    </script>
+</body>
+</html>
